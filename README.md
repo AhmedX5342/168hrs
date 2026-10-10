@@ -1,29 +1,57 @@
-# Welcome to your Lovable project
+# 168hrs
 
-This project was built with [Lovable](https://lovable.dev).
+Plan your week around **168 hours** — time, focus, and energy.
 
-## Build with Lovable
+Local-first React app. Data lives in `localStorage`.
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## Stack
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- React 19 + Vite
+- react-router-dom
+- TanStack Query
+- Tailwind CSS 4
+- shadcn/ui-style components
 
-## Development
+## Setup
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install   # or bun / pnpm
 npm run dev
 ```
 
-## Built with
+Open [http://localhost:5173](http://localhost:5173).
 
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Dev server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview build |
+| `npm test` | Vitest |
+
+## Routes
+
+| Path | Page |
+|------|------|
+| `/` | Today (`?date=` optional) |
+| `/week` | Week planner |
+| `/tasks` | Current week tasks |
+| `/tasks/weeks` | Weeks list |
+| `/tasks/:weekId` | Tasks for a week |
+| `/settings` | Settings / import-export |
+
+## Structure
+
+```
+src/
+├── main.tsx          # BrowserRouter entry
+├── App.tsx           # Routes
+├── components/       # Layout + UI
+├── features/         # Domain (tasks, today, week, settings…)
+├── pages/            # Route screens
+├── hooks/
+└── lib/
+```
+
+Path alias: `@/*` → `src/*`.
