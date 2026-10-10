@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,7 @@ export function WeekView() {
           return (
             <div key={date} className={cn("flex min-h-40 flex-col rounded-2xl border bg-card p-3", date === today && "ring-2 ring-primary")}>
               <div className="mb-3 flex items-start justify-between">
-                <Link to="/" search={{ date }} className="group">
+                <Link to={`/?date=${date}`} className="group">
                   <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground group-hover:text-primary">{formatDate(date, { weekday: "short" })}</div>
                   <div className="font-display text-2xl">{formatDate(date, { day: "numeric" })}</div>
                 </Link>
@@ -89,7 +89,7 @@ export function WeekView() {
                   <Button variant="ghost" size="icon" className="size-7" aria-label="Add block" onClick={() => setAddDate(date)}><Plus /></Button>
                 </div>
               </div>
-              <Link to="/" search={{ date }} className="flex flex-1 flex-col gap-1.5">
+              <Link to={`/?date=${date}`} className="flex flex-1 flex-col gap-1.5">
                 {blocks.map((b) => (
                   <div key={b.task.id} className={cn("flex items-center gap-2 rounded-lg bg-secondary px-2 py-1.5 text-xs", b.done && "opacity-50 line-through")}>
                     <span className={cn("h-full min-h-4 w-1 shrink-0 rounded-full", FOCUS_BG[b.task.focus])} />

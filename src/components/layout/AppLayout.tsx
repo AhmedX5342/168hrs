@@ -1,5 +1,4 @@
-import React, { useEffect } from "react";
-import { useHydrated } from "@tanstack/react-router";
+import React, { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/features/settings/use-settings";
 import { useEnsureWeeks } from "@/features/weeks/use-weeks";
@@ -35,7 +34,11 @@ function Shell({ children, className }: AppLayoutProps) {
 
 /** Data lives in localStorage, so the shell renders only after hydration. */
 function AppLayoutComponent(props: AppLayoutProps) {
-  const hydrated = useHydrated();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
   if (!hydrated) {
     return (
       <div className="flex min-h-screen items-center justify-center">
