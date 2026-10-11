@@ -8,6 +8,7 @@ export type NoteInput = {
   title?: string;
   body?: string;
   lifeAreaId?: string;
+  images?: string[];
   pinned?: boolean;
 };
 
@@ -33,6 +34,7 @@ export function useNotes() {
         title: input.title?.trim() ?? "",
         body: input.body ?? "",
         lifeAreaId: input.lifeAreaId,
+        images: input.images ?? [],
         pinned: input.pinned ?? false,
         createdAt: now,
         updatedAt: now,
@@ -44,9 +46,17 @@ export function useNotes() {
   );
 
   const updateNote = useCallback(
-    (id: string, patch: Partial<Pick<Note, "title" | "body" | "lifeAreaId" | "date" | "pinned">>) =>
+    (
+      id: string,
+      patch: Partial<Pick<Note, "title" | "body" | "lifeAreaId" | "images" | "date" | "pinned">>,
+    ) =>
       update((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: Date.now() } : n)),
+        prev.map((n) => {
+          if (n.id !== id) return n;
+          const next: Note = { ...n, ...patch, updatedAt: Date.now() };
+          if (patch.images) delete next.image; // drop legacy single-image field once migrated
+          return next;
+        }),
       ),
     [update],
   );

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Pin, PinOff, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ImagePlus, Pin, PinOff, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,29 +13,41 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDate } from "@/lib/dates";
+import { fileToDataUrl } from "@/lib/image";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
 import { useNotes } from "@/features/notes/use-notes";
+import { noteImages } from "@/features/notes/note-types";
+import { ImageViewer } from "@/features/notes/ImageViewer";
 
 const NONE = "__none";
+const MAX_IMAGES = 10;
 
 export function NotePage() {
   const { noteId } = useParams<{ noteId: string }>();
   const { settings } = useSettings();
   const { getById, updateNote, deleteNote, togglePin } = useNotes();
   const navigate = useNavigate();
+  const location = useLocation();
+  const fileRef = useRef<HTMLInputElement>(null);
   const note = noteId ? getById(noteId) : undefined;
+
+  // Where the user came from (an area view or "all notes"); falls back to the area selection
+  const backTo = (location.state as { back?: string } | null)?.back ?? "/notes";
 
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [lifeAreaId, setLifeAreaId] = useState(NONE);
+  const [images, setImages] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   useEffect(() => {
     if (!note) return;
     setTitle(note.title);
     setBody(note.body);
     setLifeAreaId(note.lifeAreaId ?? NONE);
+    setImages(noteImages(note));
   }, [note?.id, note?.updatedAt]);
 
   if (!settings.notesEnabled) return <Navigate to="/" replace />;
@@ -50,20 +62,40 @@ export function NotePage() {
     );
   }
 
+  const addImages = async (files: File[]) => {
+    const room = MAX_IMAGES - images.length;
+    if (room <= 0) {
+      toast.error(`Up to ${MAX_IMAGES} images per note`);
+      return;
+    }
+    const picked = files.slice(0, room);
+    if (files.length > room) toast.info(`Only added ${room} — max ${MAX_IMAGES} images per note`);
+    const results = await Promise.allSettled(picked.map((f) => fileToDataUrl(f)));
+    const ok = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
+    const failed = results.length - ok.length;
+    if (ok.length) setImages((prev) => [...prev, ...ok]);
+    if (failed) toast.error(`${failed} image${failed > 1 ? "s" : ""} couldn't be attached`);
+  };
+
   const save = async () => {
-    await updateNote(note.id, {
-      title: title.trim(),
-      body,
-      lifeAreaId: lifeAreaId === NONE ? undefined : lifeAreaId,
-    });
-    toast.success("Saved");
+    try {
+      await updateNote(note.id, {
+        title: title.trim(),
+        body,
+        images,
+        lifeAreaId: lifeAreaId === NONE ? undefined : lifeAreaId,
+      });
+      toast.success("Saved");
+    } catch {
+      toast.error("Couldn't save", "Browser storage may be full — try a smaller image.");
+    }
   };
 
   return (
     <article className="mx-auto max-w-2xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <Button asChild variant="ghost" size="sm" className="-ml-3">
-          <Link to="/notes">
+          <Link to={backTo}>
             <ArrowLeft /> Notes
           </Link>
         </Button>
@@ -79,11 +111,12 @@ export function NotePage() {
           <Button
             variant="outline"
             size="sm"
+            aria-label="Delete note"
             onClick={() => {
               if (!window.confirm("Delete this note?")) return;
               void deleteNote(note.id);
               toast.success("Note deleted");
-              navigate("/notes");
+              navigate(backTo);
             }}
           >
             <Trash2 />
@@ -129,6 +162,64 @@ export function NotePage() {
           </Select>
         </div>
       </header>
+
+      {/* Image attachments */}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        multiple
+        hidden
+        onChange={(e) => {
+          const files = Array.from(e.target.files ?? []);
+          if (files.length) void addImages(files);
+          e.target.value = ""; // allow re-picking the same files
+        }}
+      />
+      {images.length > 0 && (
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {images.map((src, i) => (
+            <div
+              key={i}
+              className="group relative aspect-square overflow-hidden rounded-xl border bg-muted"
+            >
+              <button
+                type="button"
+                aria-label={`Open image ${i + 1}`}
+                className="size-full cursor-zoom-in"
+                onClick={() => setViewing(i)}
+              >
+                <img src={src} alt="" className="size-full object-cover" />
+              </button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                aria-label={`Remove image ${i + 1}`}
+                className="absolute right-1.5 top-1.5 size-7 rounded-full opacity-90 shadow"
+                onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="mb-6 border-dashed"
+        disabled={images.length >= MAX_IMAGES}
+        onClick={() => fileRef.current?.click()}
+      >
+        <ImagePlus /> {images.length ? "Add more images" : "Attach images"}
+      </Button>
+      <ImageViewer
+        images={images}
+        index={viewing}
+        onIndexChange={setViewing}
+        onClose={() => setViewing(null)}
+      />
 
       <Textarea
         value={body}
