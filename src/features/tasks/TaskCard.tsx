@@ -1,6 +1,11 @@
 import { CalendarClock, MoreVertical, Pencil, Repeat, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DAY_SHORT, formatDate, formatDuration } from "@/lib/dates";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
@@ -11,7 +16,11 @@ import type { Task } from "./types";
 function repeatLabel(t: Task) {
   if (t.repeat === "daily") return "Daily";
   if (t.repeat === "weekdays") return "Weekdays";
-  if (t.repeat === "days") return [...t.days].sort().map((d) => DAY_SHORT[d]).join(", ");
+  if (t.repeat === "days")
+    return [...t.days]
+      .sort()
+      .map((d) => DAY_SHORT[d])
+      .join(", ");
   return t.date ? formatDate(t.date, { weekday: "short", day: "2-digit", month: "short" }) : null;
 }
 
@@ -38,12 +47,28 @@ export function TaskCard({ task, onEdit, onSchedule, onDelete }: Props) {
           <h3 className="truncate font-sans text-base font-semibold">{task.title}</h3>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="-mr-2 -mt-1 size-8" aria-label="Task actions"><MoreVertical /></Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-2 -mt-1 size-8"
+                aria-label="Task actions"
+              >
+                <MoreVertical />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onSchedule}><CalendarClock /> Schedule</DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}><Pencil /> Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive"><Trash2 /> Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSchedule}>
+                <CalendarClock /> Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil /> Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 /> Delete
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -55,7 +80,9 @@ export function TaskCard({ task, onEdit, onSchedule, onDelete }: Props) {
           {when && <span>{when}</span>}
           {task.startTime && <span>· {task.startTime}</span>}
         </div>
-        {task.notes && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{task.notes}</p>}
+        {task.notes && (
+          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{task.notes}</p>
+        )}
         {!scheduled && (
           <Button variant="outline" size="sm" className="mt-3 h-8" onClick={onSchedule}>
             <CalendarClock /> Schedule

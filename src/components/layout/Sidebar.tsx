@@ -7,7 +7,7 @@ export function Sidebar({ name }: { name: string }) {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-5 py-8 md:flex">
       <NavLink to="/" className="mb-10 flex items-baseline gap-1 px-2">
         <span className="font-display text-4xl text-gradient-primary">168</span>
-        <span className="text-sm font-semibold tracking-widest text-muted-foreground">HRS</span>
+        <span className="text-sm font-semibold tracking-[0.2em] text-muted-foreground">hrs</span>
       </NavLink>
       <nav className="flex flex-col gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (

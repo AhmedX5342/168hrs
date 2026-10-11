@@ -5,16 +5,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { clearAll, exportAll, importAll } from "@/lib/storage";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
+import { WEEKDAY_OPTIONS, type WeekStartDay } from "@/features/settings/types";
 import { LIFE_AREA_ICONS, LifeAreaIcon } from "@/features/life-areas/icons";
 
 export function SettingsPage() {
-  const { settings, patch } = useSettings();
+  const { settings, patch, weeklySleepHours } = useSettings();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [areaName, setAreaName] = useState("");
@@ -42,8 +50,9 @@ export function SettingsPage() {
     <>
       <PageHeader eyebrow="Preferences" title="Settings" />
       <Tabs defaultValue="general">
-        <TabsList className="mb-6">
+        <TabsList className="mb-6 flex h-auto flex-wrap">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="sleep">Sleep</TabsTrigger>
           <TabsTrigger value="areas">Life areas</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
         </TabsList>
@@ -51,38 +60,124 @@ export function SettingsPage() {
         <TabsContent value="general" className="max-w-md space-y-5">
           <div className="space-y-1.5">
             <Label>Display name</Label>
-            <Input defaultValue={settings.name} onBlur={(e) => patch({ name: e.target.value.trim() })} />
+            <Input
+              defaultValue={settings.name}
+              onBlur={(e) => patch({ name: e.target.value.trim() })}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Week starts on</Label>
-            <Select value={String(settings.weekStartsOn)} onValueChange={(v) => patch({ weekStartsOn: v === "0" ? 0 : 1 })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Label>First day of the week</Label>
+            <Select
+              value={String(settings.weekStartsOn)}
+              onValueChange={(v) => patch({ weekStartsOn: Number(v) as WeekStartDay })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1">Monday</SelectItem>
-                <SelectItem value="0">Sunday</SelectItem>
+                {WEEKDAY_OPTIONS.map((d) => (
+                  <SelectItem key={d.value} value={String(d.value)}>
+                    {d.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Sleep / fixed hours per week</Label>
-            <Input
-              type="number"
-              min={0}
-              max={168}
-              defaultValue={settings.sleepHours}
-              onBlur={(e) => patch({ sleepHours: Math.min(168, Math.max(0, Number(e.target.value) || 0)) })}
+            <Label>Clock format</Label>
+            <Select
+              value={settings.clockFormat}
+              onValueChange={(v) => patch({ clockFormat: v === "12" ? "12" : "24" })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="24">24-hour</SelectItem>
+                <SelectItem value="12">12-hour</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between rounded-xl border px-3 py-3">
+            <div>
+              <div className="text-sm font-medium">Display unscheduled tasks</div>
+              <p className="text-xs text-muted-foreground">
+                Show them on Today and count toward capacity
+              </p>
+            </div>
+            <Switch
+              checked={settings.showUnscheduled}
+              onCheckedChange={(c) => patch({ showUnscheduled: c })}
             />
-            <p className="text-xs text-muted-foreground">{168 - settings.sleepHours}h available each week.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Theme</Label>
-            <Select value={settings.theme} onValueChange={(v) => patch({ theme: v === "dark" ? "dark" : "light" })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={settings.theme}
+              onValueChange={(v) => patch({ theme: v === "dark" ? "dark" : "light" })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="light">Light</SelectItem>
                 <SelectItem value="dark">Dark</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sleep" className="max-w-md space-y-5">
+          <div className="space-y-1.5">
+            <Label>Target sleep hours per night</Label>
+            <Input
+              type="number"
+              min={0}
+              max={16}
+              step={0.5}
+              defaultValue={settings.sleepHoursPerDay}
+              onBlur={(e) =>
+                patch({ sleepHoursPerDay: Math.min(16, Math.max(0, Number(e.target.value) || 0)) })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              {settings.sleepHoursPerDay}h × 7 = {weeklySleepHours}h sleep / week ·{" "}
+              {168 - weeklySleepHours}h awake capacity
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Usual bedtime</Label>
+              <Input
+                type="time"
+                defaultValue={settings.sleepBedtime}
+                onBlur={(e) => patch({ sleepBedtime: e.target.value || "23:00" })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Usual wake time</Label>
+              <Input
+                type="time"
+                defaultValue={settings.sleepWakeTarget}
+                onBlur={(e) => patch({ sleepWakeTarget: e.target.value || "07:00" })}
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Ideal sleep (hrs) — excess is “wasted”</Label>
+            <Input
+              type="number"
+              min={4}
+              max={12}
+              step={0.5}
+              defaultValue={settings.idealSleepHours}
+              onBlur={(e) =>
+                patch({ idealSleepHours: Math.min(12, Math.max(4, Number(e.target.value) || 8)) })
+              }
+            />
+            <p className="text-xs text-muted-foreground">
+              Default 8h. On first open each day you log actual wake time.
+            </p>
           </div>
         </TabsContent>
 
@@ -98,7 +193,9 @@ export function SettingsPage() {
                   variant="ghost"
                   size="icon"
                   aria-label={`Remove ${a.name}`}
-                  onClick={() => patch({ lifeAreas: settings.lifeAreas.filter((x) => x.id !== a.id) })}
+                  onClick={() =>
+                    patch({ lifeAreas: settings.lifeAreas.filter((x) => x.id !== a.id) })
+                  }
                 >
                   <Trash2 />
                 </Button>
@@ -107,7 +204,11 @@ export function SettingsPage() {
           </div>
           <div className="space-y-3 rounded-2xl border border-dashed p-4">
             <Label>New life area</Label>
-            <Input placeholder="Freelance" value={areaName} onChange={(e) => setAreaName(e.target.value)} />
+            <Input
+              placeholder="Freelance"
+              value={areaName}
+              onChange={(e) => setAreaName(e.target.value)}
+            />
             <div className="flex flex-wrap gap-2">
               {Object.keys(LIFE_AREA_ICONS).map((k) => (
                 <button
@@ -117,7 +218,9 @@ export function SettingsPage() {
                   onClick={() => setAreaIcon(k)}
                   className={cn(
                     "flex size-9 items-center justify-center rounded-xl border transition-colors",
-                    areaIcon === k ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent",
+                    areaIcon === k
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "hover:bg-accent",
                   )}
                 >
                   <LifeAreaIcon icon={k} className="size-4" />
@@ -132,7 +235,10 @@ export function SettingsPage() {
                   return;
                 }
                 await patch({
-                  lifeAreas: [...settings.lifeAreas, { id: crypto.randomUUID(), name, icon: areaIcon }],
+                  lifeAreas: [
+                    ...settings.lifeAreas,
+                    { id: crypto.randomUUID(), name, icon: areaIcon },
+                  ],
                 });
                 setAreaName("");
                 toast.success("Life area added", name);
