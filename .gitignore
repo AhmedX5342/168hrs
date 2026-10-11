@@ -33,6 +33,9 @@ dist-ssr
 
 # Capacitor / Android (build outputs only)
 android/.gradle/
+android/gradle/
+android/gradle/*
+
 android/app/build/
 android/build/
 android/local.properties
