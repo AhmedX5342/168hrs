@@ -30,3 +30,28 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Capacitor / Android (build outputs only)
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/captures/
+android/.idea/
+android/*.iml
+android/app/release/
+*.apk
+*.aab
+
+# Capacitor iOS (if added later)
+ios/App/Pods/
+ios/DerivedData/
+ios/**/xcuserdata/
+ios/**/*.xcuserstate
+
+# Misc
+.cache/
+tmp/
+temp/
+*.zip
+.eslintcache
