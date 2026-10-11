@@ -28,11 +28,15 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      # Do NOT install the obsolete "tools" package (removed from current cmdline-tools).
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools build-tools;34.0.0 build-tools;35.0.0 platforms;android-34 platforms;android-35
 
       - name: Install JS dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
       - name: Build web app
         run: npm run build
@@ -40,14 +44,25 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
       - name: Locate APK
         id: apk
         run: |
           APK=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "No APK found under android/app/build/outputs/apk"
+            find android/app/build/outputs -type f || true
+            exit 1
+          fi
           echo "path=$APK" >> "$GITHUB_OUTPUT"
           echo "Found APK: $APK"
           cp "$APK" "168hrs-${{ github.sha }}.apk"
