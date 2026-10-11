@@ -5,6 +5,7 @@ import { formatClock, formatDate, formatDuration, minToTime } from "@/lib/dates"
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
 import { FocusBadge } from "@/features/tasks/FocusBadge";
+import { WeeklyBadge } from "@/features/tasks/WeeklyBadge";
 import { taskAreaColor } from "@/features/tasks/task-color";
 import { progressKey, type Block } from "@/features/tasks/types";
 
@@ -73,7 +74,7 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
         ) : (
           <>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {unscheduled ? "Unscheduled" : "No time set"}
+              {unscheduled ? "Unscheduled" : task.repeat === "weekly" ? "This week" : "No time set"}
             </div>
             <div className="font-display text-xl">{formatDuration(task.duration)}</div>
           </>
@@ -88,6 +89,7 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
             {formatDuration(task.duration)}
           </span>
           <FocusBadge focus={task.focus} />
+          {task.repeat === "weekly" && <WeeklyBadge />}
           {block.overdue && !done && (
             <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
               Overdue

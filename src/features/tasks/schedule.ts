@@ -1,13 +1,23 @@
 import { dayOfWeek, timeToMin, weekDates } from "@/lib/dates";
-import type { Block, Task } from "./types";
+import { weeklyProgressKey, type Block, type Task } from "./types";
 
 /** A day can hold at most 24h of scheduled work. */
 export const DAY_MIN = 24 * 60;
 
 type Occurrence = Pick<Task, "repeat" | "date" | "days" | "weekStart">;
 
+/** Weekly = once per week, done anytime during the week (not tied to a day). */
+export const isWeekly = (t: Pick<Task, "repeat">) => t.repeat === "weekly";
+
+/** The date a weekly task was completed within the given week, if any */
+export function weeklyDoneOn(t: Task, weekStart: string): string | undefined {
+  const days = weekDates(weekStart);
+  return [...t.completions].sort().find((c) => days.includes(c));
+}
+
 export function occursOn(task: Occurrence, date: string): boolean {
   if (task.repeat === "once") return task.date === date;
+  if (task.repeat === "weekly") return false; // not tied to a specific day
   if (date < task.weekStart) return false;
   if (task.repeat === "daily") return true;
   return task.days.includes(dayOfWeek(date));
@@ -50,11 +60,19 @@ export function firstFullDay(
   return null;
 }
 
-/** Scheduled blocks, plus optional unscheduled / overdue blocks, for a day. */
+/** Scheduled blocks, plus optional unscheduled / overdue / weekly blocks, for a day. */
 export function blocksForDate(
   tasks: Task[],
   date: string,
-  opts?: { showUnscheduled?: boolean; weekStart?: string; includeOverdue?: boolean },
+  opts?: {
+    showUnscheduled?: boolean;
+    weekStart?: string;
+    includeOverdue?: boolean;
+    /** Completed weekly tasks, shown on the day they were completed */
+    includeWeekly?: boolean;
+    /** Uncompleted weekly tasks, shown on this day (use for "today") */
+    includeWeeklyPending?: boolean;
+  },
 ): Block[] {
   const showUnscheduled = opts?.showUnscheduled ?? false;
   const weekStart = opts?.weekStart;
@@ -74,6 +92,32 @@ export function blocksForDate(
         unscheduled: false,
       };
     });
+
+  // Weekly tasks: pending ones float on "today", completed ones sit on their completion day
+  const weekly: Block[] = [];
+  if (weekStart && (opts?.includeWeekly || opts?.includeWeeklyPending)) {
+    if (weekDates(weekStart).includes(date)) {
+      tasksForWeek(tasks, weekStart)
+        .filter(isWeekly)
+        .forEach((t, i) => {
+          const doneOn = weeklyDoneOn(t, weekStart);
+          const base = {
+            task: t,
+            date,
+            start: 24 * 60 + 500 + i,
+            end: 24 * 60 + 500 + i + t.duration,
+            unscheduled: false,
+            weekly: true,
+            weekStart,
+          };
+          if (doneOn) {
+            if (opts?.includeWeekly && doneOn === date) weekly.push({ ...base, done: true });
+          } else if (opts?.includeWeeklyPending) {
+            weekly.push({ ...base, done: false });
+          }
+        });
+    }
+  }
 
   // One-time tasks with no day yet (floating through the week)
   const unscheduled: Block[] =
@@ -120,7 +164,7 @@ export function blocksForDate(
         }))
     : [];
 
-  return [...scheduled, ...unscheduled, ...overdue].sort((a, b) => a.start - b.start);
+  return [...scheduled, ...weekly, ...unscheduled, ...overdue].sort((a, b) => a.start - b.start);
 }
 
 /** Tasks visible in a given week's library */
@@ -139,6 +183,10 @@ export function remainingWorkMin(
       if (!t.completions.length) total += t.duration;
       continue;
     }
+    if (isWeekly(t)) {
+      if (!weeklyDoneOn(t, weekStart)) total += t.duration;
+      continue;
+    }
     for (const d of weekDatesList) {
       if (occursOn(t, d) && !t.completions.includes(d)) total += t.duration;
     }
@@ -150,7 +198,7 @@ export function remainingWorkMin(
 export function plannedWeekMin(tasks: Task[], weekStart: string, weekDatesList: string[]): number {
   let total = 0;
   for (const t of tasksForWeek(tasks, weekStart)) {
-    if (isUnscheduled(t)) {
+    if (isUnscheduled(t) || isWeekly(t)) {
       total += t.duration;
       continue;
     }
@@ -162,7 +210,7 @@ export function plannedWeekMin(tasks: Task[], weekStart: string, weekDatesList: 
 }
 
 export interface TaskStatus {
-  /** Date a one-time task was completed */
+  /** Date a one-time (or weekly) task was completed */
   completedOn?: string;
   /** Some progress saved but not finished */
   partial?: { startedAt?: string | undefined; pct: number };
@@ -176,6 +224,16 @@ export interface TaskStatus {
 export function taskStatus(t: Task, today: string, weekStart?: string): TaskStatus {
   const pctOf = (p: { elapsed: number; total: number }) =>
     Math.min(100, Math.round((p.elapsed / Math.max(1, p.total)) * 100));
+
+  if (t.repeat === "weekly") {
+    const ws = weekStart ?? t.weekStart;
+    const completedOn = weeklyDoneOn(t, ws);
+    if (completedOn) return { completedOn };
+    const status: TaskStatus = {};
+    const p = t.progress?.[weeklyProgressKey(ws)];
+    if (p && p.elapsed > 0) status.partial = { startedAt: p.startedAt, pct: pctOf(p) };
+    return status;
+  }
 
   if (t.repeat === "once") {
     const completedOn = [...t.completions].sort().at(-1);

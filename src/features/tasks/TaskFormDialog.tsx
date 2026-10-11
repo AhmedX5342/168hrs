@@ -38,7 +38,7 @@ const schema = z
     hours: z.coerce.number().min(0.25, "At least 15 minutes").max(24, "Max 24 hours"),
     focus: z.enum(["deep", "medium", "light"]),
     lifeAreaId: z.string(),
-    repeat: z.enum(["once", "daily", "days"]),
+    repeat: z.enum(["once", "daily", "weekly", "days"]),
     days: z.array(z.number()),
     date: z.string(),
     startTime: z.string(),
@@ -125,7 +125,8 @@ export function TaskFormDialog({
       repeat: v.repeat,
       days: v.repeat === "days" ? v.days : [],
       date: v.repeat === "once" && v.date !== NONE ? v.date : null,
-      startTime: v.startTime || null,
+      // Weekly tasks are done anytime during the week, so they never have a start time
+      startTime: v.repeat === "weekly" ? null : v.startTime || null,
     };
 
     // A day can't hold more than 24h of scheduled work
@@ -234,7 +235,10 @@ export function TaskFormDialog({
                   <SelectContent>
                     <SelectItem value="once">One-time</SelectItem>
                     <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="days">Weekly (choose days)</SelectItem>
+                    <SelectItem value="weekly">
+                      Weekly (done anytime throughout the week)
+                    </SelectItem>
+                    <SelectItem value="days">Custom</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -267,42 +271,44 @@ export function TaskFormDialog({
               />
             </Field>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            {repeat === "once" && (
-              <Field label="Day">
-                <Controller
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NONE}>Unscheduled</SelectItem>
-                        {dates.map((d) => {
-                          const full = dayLoadMin(tasks, d, task?.id) + durationMin > DAY_MIN;
-                          return (
-                            <SelectItem key={d} value={d} disabled={full}>
-                              {formatDate(d, {
-                                weekday: "short",
-                                day: "2-digit",
-                                month: "short",
-                              })}
-                              {full ? " — full" : ""}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
+          {repeat !== "weekly" && (
+            <div className="grid grid-cols-2 gap-3">
+              {repeat === "once" && (
+                <Field label="Day">
+                  <Controller
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NONE}>Unscheduled</SelectItem>
+                          {dates.map((d) => {
+                            const full = dayLoadMin(tasks, d, task?.id) + durationMin > DAY_MIN;
+                            return (
+                              <SelectItem key={d} value={d} disabled={full}>
+                                {formatDate(d, {
+                                  weekday: "short",
+                                  day: "2-digit",
+                                  month: "short",
+                                })}
+                                {full ? " — full" : ""}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </Field>
+              )}
+              <Field label="Start time (optional)">
+                <Input type="time" {...form.register("startTime")} />
               </Field>
-            )}
-            <Field label="Start time (optional)">
-              <Input type="time" {...form.register("startTime")} />
-            </Field>
-          </div>
+            </div>
+          )}
 
           <Field label="Notes (optional)">
             <Textarea rows={2} {...form.register("notes")} />

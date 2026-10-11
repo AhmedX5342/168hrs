@@ -78,6 +78,10 @@ export function TodayView({ date }: { date: string }) {
     showUnscheduled: settings.showUnscheduled,
     weekStart,
     includeOverdue: isToday,
+    // Weekly tasks: completed ones show on their completion day,
+    // pending ones show on today
+    includeWeekly: true,
+    includeWeeklyPending: isToday,
   });
   const planned = blocks.reduce((s, b) => s + b.task.duration, 0);
   const done = blocks.filter((b) => b.done).reduce((s, b) => s + b.task.duration, 0);

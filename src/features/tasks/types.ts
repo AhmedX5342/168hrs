@@ -1,7 +1,10 @@
 export type Focus = "deep" | "medium" | "light";
 
-/** "days" = weekly on the chosen days */
-export type RepeatType = "once" | "daily" | "days";
+/**
+ * "days" = custom: repeats on the chosen weekdays
+ * "weekly" = once per week, done anytime during the week
+ */
+export type RepeatType = "once" | "daily" | "days" | "weekly";
 
 /** Saved focus-session progress for one occurrence of a task (seconds). */
 export interface TaskProgress {
@@ -47,15 +50,27 @@ export interface Block {
   unscheduled?: boolean;
   /** One-time task whose planned day has passed and is still open (or was finished late today) */
   overdue?: boolean;
+  /** Weekly (do-anytime-this-week) task */
+  weekly?: boolean;
+  /** Week this block belongs to (weekly blocks only) */
+  weekStart?: string;
 }
+
+/** Progress key for a weekly task, one entry per week */
+export const weeklyProgressKey = (weekStart: string) => `week:${weekStart}`;
 
 /**
  * Key under which a block's partial progress is stored.
  * One-time tasks keep one shared progress entry for the task itself, so it
- * survives rescheduling and can be resumed on any day. Recurring tasks track each date separately.
+ * survives rescheduling and can be resumed on any day. Weekly tasks keep one
+ * entry per week. Other recurring tasks track each date separately.
  */
-export const progressKey = (b: Pick<Block, "date" | "task">): string =>
-  b.task.repeat === "once" ? "floating" : b.date;
+export const progressKey = (b: Pick<Block, "date" | "task" | "weekStart">): string =>
+  b.task.repeat === "once"
+    ? "floating"
+    : b.task.repeat === "weekly" && b.weekStart
+      ? weeklyProgressKey(b.weekStart)
+      : b.date;
 
 export const FOCUS_LABEL: Record<Focus, string> = {
   deep: "Deep",

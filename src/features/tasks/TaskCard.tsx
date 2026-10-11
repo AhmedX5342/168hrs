@@ -11,6 +11,7 @@ import { DAY_SHORT, formatDate, formatDuration, todayISO } from "@/lib/dates";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
 import { FocusBadge } from "./FocusBadge";
+import { WeeklyBadge } from "./WeeklyBadge";
 import { isUnscheduled, taskStatus } from "./schedule";
 import { taskAreaColor, taskAreaTint } from "./task-color";
 import type { Task } from "./types";
@@ -18,9 +19,10 @@ import type { Task } from "./types";
 const short = (d: string) => formatDate(d, { day: "numeric", month: "short" });
 
 function repeatLabel(t: Task) {
+  if (t.repeat === "weekly") return null;
   if (t.repeat === "daily") return "Daily";
   if (t.repeat === "days")
-    return `Weekly · ${[...t.days]
+    return `Custom · ${[...t.days]
       .sort()
       .map((d) => DAY_SHORT[d])
       .join(", ")}`;
@@ -103,6 +105,7 @@ export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Prop
 
         {/* Status */}
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {task.repeat === "weekly" && <WeeklyBadge />}
           {status.completedOn && (
             <span className="rounded-full bg-success/15 px-2 py-0.5 font-semibold text-success">
               Completed · {short(status.completedOn)}
@@ -135,7 +138,7 @@ export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Prop
           <span className="font-semibold text-foreground">{formatDuration(task.duration)}</span>
           <FocusBadge focus={task.focus} />
           {area && <span>{area.name}</span>}
-          {task.repeat !== "once" && <Repeat className="size-3" />}
+          {task.repeat !== "once" && task.repeat !== "weekly" && <Repeat className="size-3" />}
           {when && <span>{when}</span>}
           {task.startTime && <span>· {task.startTime}</span>}
         </div>

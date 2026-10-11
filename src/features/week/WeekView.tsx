@@ -10,14 +10,17 @@ import {
   DAY_MIN,
   blocksForDate,
   isUnscheduled,
+  isWeekly,
   occursOn,
   plannedWeekMin,
   remainingWorkMin,
   tasksForWeek,
+  weeklyDoneOn,
 } from "@/features/tasks/schedule";
 import { taskAreaColor } from "@/features/tasks/task-color";
 import { UNEXPECTED_BAR } from "@/features/tasks/types";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
+import { WeeklyBadge } from "@/features/tasks/WeeklyBadge";
 import { weekRangeLabel } from "@/features/tasks/WeekTasksView";
 
 const TOTAL_MIN = 168 * 60;
@@ -66,7 +69,8 @@ export function WeekView() {
   const weekDays = weekDates(weekStart);
   const days = weekDays.map((d) => ({
     date: d,
-    blocks: blocksForDate(tasks, d, { showUnscheduled: false, weekStart }),
+    // includeWeekly: completed weekly tasks appear on the day they were completed
+    blocks: blocksForDate(tasks, d, { showUnscheduled: false, weekStart, includeWeekly: true }),
   }));
   const plannedMin = plannedWeekMin(tasks, weekStart, weekDays);
   const sleepMin = Math.round(weeklySleepHours * 60);
@@ -74,6 +78,8 @@ export function WeekView() {
   const freeMin = Math.max(0, capacityMin - plannedMin);
   const remainingMin = remainingWorkMin(tasks, weekStart, weekDays);
   const today = todayISO();
+
+  const weeklyTasks = tasksForWeek(tasks, weekStart).filter(isWeekly);
 
   const areaBars = useMemo(() => {
     const weekTasks = tasksForWeek(tasks, weekStart);
@@ -87,6 +93,8 @@ export function WeekView() {
       if (isUnscheduled(t)) {
         if (counted.has(t.id)) continue;
         counted.add(t.id);
+        min = t.duration;
+      } else if (isWeekly(t)) {
         min = t.duration;
       } else {
         for (const d of weekDays) {
@@ -140,6 +148,8 @@ export function WeekView() {
         if (counted.has(t.id)) continue;
         counted.add(t.id);
         if (t.completions.some((c) => days7.includes(c))) min += t.duration;
+      } else if (isWeekly(t)) {
+        if (weeklyDoneOn(t, weekStart)) min += t.duration;
       } else {
         for (const d of days7) {
           if (occursOn(t, d) && t.completions.includes(d)) min += t.duration;
@@ -320,7 +330,8 @@ export function WeekView() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
         {days.map(({ date, blocks }) => {
-          const total = blocks.reduce((s, b) => s + b.task.duration, 0);
+          // Weekly tasks aren't tied to a day, so they don't count toward the day's 24h
+          const total = blocks.filter((b) => !b.weekly).reduce((s, b) => s + b.task.duration, 0);
           const full = total >= DAY_MIN;
           return (
             <div
@@ -382,6 +393,7 @@ export function WeekView() {
                       }}
                     />
                     <span className="min-w-0 flex-1 truncate font-medium">{b.task.title}</span>
+                    {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
                     <span className="text-muted-foreground">{formatDuration(b.task.duration)}</span>
                   </div>
                 ))}
@@ -393,6 +405,58 @@ export function WeekView() {
           );
         })}
       </div>
+
+      {/* Weekly tasks: every weekly task for this week, done or not */}
+      <section className="mt-10">
+        <h2 className="mb-3 flex items-baseline gap-2 text-2xl">
+          Weekly tasks{" "}
+          <span className="font-sans text-sm text-muted-foreground">{weeklyTasks.length}</span>
+        </h2>
+        {weeklyTasks.length ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {weeklyTasks.map((t) => {
+              const doneOn = weeklyDoneOn(t, weekStart);
+              return (
+                <div
+                  key={t.id}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm",
+                    doneOn && "opacity-70",
+                  )}
+                >
+                  <span
+                    className="h-8 w-1 shrink-0 rounded-full"
+                    style={{ backgroundColor: taskAreaColor(settings.lifeAreas, t.lifeAreaId) }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className={cn("truncate font-semibold", doneOn && "line-through")}>
+                      {t.title}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <WeeklyBadge short />
+                      <span>{formatDuration(t.duration)}</span>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 text-xs font-semibold",
+                      doneOn ? "text-success" : "text-muted-foreground",
+                    )}
+                  >
+                    {doneOn
+                      ? `Done · ${formatDate(doneOn, { weekday: "short", day: "numeric", month: "short" })}`
+                      : "Pending"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No weekly tasks.
+          </p>
+        )}
+      </section>
 
       <TaskFormDialog
         open={!!addDate}
