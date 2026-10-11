@@ -22,6 +22,8 @@ export interface Settings {
   clockFormat: "12" | "24";
   /** Show unscheduled week tasks on Today and in capacity math */
   showUnscheduled: boolean;
+  /** Show Notes in navigation */
+  notesEnabled: boolean;
   theme: "light" | "dark";
   lifeAreas: LifeArea[];
   /** @deprecated migrated to sleepHoursPerDay */
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
   idealSleepHours: 8,
   clockFormat: "24",
   showUnscheduled: true,
+  notesEnabled: true,
   theme: "light",
   lifeAreas: [
     { id: "work", name: "Work", icon: "briefcase" },

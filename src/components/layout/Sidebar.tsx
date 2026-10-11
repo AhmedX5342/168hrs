@@ -1,8 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { NAV_ITEMS } from "./nav-items";
+import { visibleNavItems } from "./nav-items";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/features/settings/use-settings";
 
 export function Sidebar({ name }: { name: string }) {
+  const { settings } = useSettings();
+  const items = visibleNavItems(settings.notesEnabled);
+
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-5 py-8 md:flex">
       <NavLink to="/" className="mb-10 flex items-baseline gap-1 px-2">
@@ -10,7 +14,7 @@ export function Sidebar({ name }: { name: string }) {
         <span className="text-sm font-semibold tracking-[0.2em] text-muted-foreground">hrs</span>
       </NavLink>
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {items.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

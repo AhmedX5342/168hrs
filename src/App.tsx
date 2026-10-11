@@ -7,11 +7,12 @@ import { TasksPage } from "@/pages/TasksPage";
 import { WeekTasksPage } from "@/pages/WeekTasksPage";
 import { WeeksPage } from "@/pages/WeeksPage";
 import { SettingsPage } from "@/pages/SettingsPage";
+import { NotesPage } from "@/pages/NotesPage";
+import { NotePage } from "@/pages/NotePage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 /**
  * App assumes it is already wrapped in <BrowserRouter> (see main.tsx).
- * Do not put NavLink / useNavigate / useLocation outside that provider.
  */
 export default function App() {
   return (
@@ -23,6 +24,8 @@ export default function App() {
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/tasks/weeks" element={<WeeksPage />} />
           <Route path="/tasks/:weekId" element={<WeekTasksPage />} />
+          <Route path="/notes" element={<NotesPage />} />
+          <Route path="/notes/:noteId" element={<NotePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
           <Route path="*" element={<NotFoundPage />} />

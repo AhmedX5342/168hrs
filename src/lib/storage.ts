@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   tasks: "tasks",
   weeks: "weeks",
   sleepLogs: "sleepLogs",
+  notes: "notes",
 } as const;
 
 export type StorageKey = (typeof STORAGE_KEYS)[keyof typeof STORAGE_KEYS];

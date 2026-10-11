@@ -125,6 +125,17 @@ export function SettingsPage() {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="flex items-center justify-between rounded-xl border px-3 py-3">
+            <div>
+              <div className="text-sm font-medium">Notes</div>
+              <p className="text-xs text-muted-foreground">Show the Notes page in navigation</p>
+            </div>
+            <Switch
+              checked={settings.notesEnabled}
+              onCheckedChange={(c) => patch({ notesEnabled: c })}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="sleep" className="max-w-md space-y-5">
