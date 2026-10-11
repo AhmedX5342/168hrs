@@ -24,6 +24,8 @@ import {
   type WeekStartDay,
 } from "@/features/settings/types";
 import { LIFE_AREA_ICONS, LifeAreaIcon } from "@/features/life-areas/icons";
+import { nextAreaColor } from "@/features/life-areas/colors";
+import { AreaColorButton } from "../life-areas/AreaColorButton";
 
 const schema = z.object({ name: z.string().trim().min(1, "Tell us what to call you").max(40) });
 
@@ -88,7 +90,10 @@ export function Onboarding() {
       toast.error("Give the life area a name");
       return;
     }
-    setLifeAreas((prev) => [...prev, { id: crypto.randomUUID(), name, icon: areaIcon }]);
+    setLifeAreas((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name, icon: areaIcon, color: nextAreaColor(prev) },
+    ]);
     setAreaName("");
     setAreaIcon("sparkles");
     setAdding(false);
@@ -185,6 +190,12 @@ export function Onboarding() {
                     <LifeAreaIcon icon={a.icon} className="size-4" />
                   </div>
                   <span className="flex-1 font-medium">{a.name}</span>
+                  <AreaColorButton
+                    color={a.color}
+                    onChange={(color) =>
+                      setLifeAreas((prev) => prev.map((x) => (x.id === a.id ? { ...x, color } : x)))
+                    }
+                  />
                   <Button
                     type="button"
                     variant="ghost"

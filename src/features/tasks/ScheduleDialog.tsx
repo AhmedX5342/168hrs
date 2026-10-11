@@ -19,6 +19,7 @@ import {
 import { formatDate, weekDates } from "@/lib/dates";
 import { toast } from "@/lib/toast";
 import { useTasks } from "./use-tasks";
+import { DAY_MIN, dayLoadMin, firstFullDay } from "./schedule";
 import type { Task } from "./types";
 
 export function ScheduleDialog({
@@ -30,15 +31,15 @@ export function ScheduleDialog({
   weekStart: string;
   onOpenChange: (o: boolean) => void;
 }) {
-  const { updateTask } = useTasks();
+  const { tasks, updateTask } = useTasks();
   const dates = weekDates(weekStart);
   const [date, setDate] = useState<string>(dates[0] ?? weekStart);
-  const [time, setTime] = useState("09:00");
+  const [time, setTime] = useState("");
 
   useEffect(() => {
     if (task) {
       setDate(task.date ?? dates[0] ?? weekStart);
-      setTime(task.startTime ?? "09:00");
+      setTime(task.startTime ?? "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task]);
@@ -47,11 +48,15 @@ export function ScheduleDialog({
   const once = task.repeat === "once";
 
   const save = async () => {
-    if (!time) {
-      toast.error("Pick a start time");
+    const full = firstFullDay(tasks, { ...task, date: once ? date : task.date }, task.id);
+    if (full) {
+      toast.error(
+        "That day is full",
+        `${formatDate(full, { weekday: "long", day: "numeric", month: "short" })} already has 24h scheduled.`,
+      );
       return;
     }
-    await updateTask(task.id, { startTime: time, ...(once ? { date } : {}) });
+    await updateTask(task.id, { startTime: time || null, ...(once ? { date } : {}) });
     toast.success("Scheduled", task.title);
     onOpenChange(false);
   };
@@ -72,17 +77,21 @@ export function ScheduleDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {dates.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {formatDate(d, { weekday: "long", day: "2-digit", month: "short" })}
-                    </SelectItem>
-                  ))}
+                  {dates.map((d) => {
+                    const full = dayLoadMin(tasks, d, task.id) + task.duration > DAY_MIN;
+                    return (
+                      <SelectItem key={d} value={d} disabled={full}>
+                        {formatDate(d, { weekday: "long", day: "2-digit", month: "short" })}
+                        {full ? " — full" : ""}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
           )}
           <div className="space-y-1.5">
-            <Label>Start time</Label>
+            <Label>Start time (optional)</Label>
             <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </div>
         </div>

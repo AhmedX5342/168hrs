@@ -16,7 +16,10 @@ export function useWeeks() {
       update((prev) => {
         const set = new Set(prev);
         if (set.has(currentWeek)) return prev;
-        const last = [...set].filter((w) => w < currentWeek).sort().at(-1);
+        const last = [...set]
+          .filter((w) => w < currentWeek)
+          .sort()
+          .at(-1);
         if (last) for (let w = addDays(last, 7); w < currentWeek; w = addDays(w, 7)) set.add(w);
         set.add(currentWeek);
         return [...set].sort();

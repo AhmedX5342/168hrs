@@ -1,7 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { useStored } from "@/lib/use-stored";
-import { DEFAULT_SETTINGS, type Settings, type WeekStartDay } from "./types";
+import { colorAt } from "@/features/life-areas/colors";
+import { DEFAULT_SETTINGS, type LifeArea, type Settings, type WeekStartDay } from "./types";
 
 function migrate(raw: Partial<Settings> | null | undefined): Settings {
   const base = { ...DEFAULT_SETTINGS, ...raw };
@@ -12,6 +13,13 @@ function migrate(raw: Partial<Settings> | null | undefined): Settings {
   if (typeof base.weekStartsOn !== "number" || base.weekStartsOn < 0 || base.weekStartsOn > 6) {
     base.weekStartsOn = 1;
   }
+  // Life areas saved before colors existed get one (the default for built-ins, else by position)
+  base.lifeAreas = (base.lifeAreas as (Omit<LifeArea, "color"> & { color?: string })[]).map(
+    (a, i): LifeArea => ({
+      ...a,
+      color: a.color ?? DEFAULT_SETTINGS.lifeAreas.find((d) => d.id === a.id)?.color ?? colorAt(i),
+    }),
+  );
   return base as Settings;
 }
 

@@ -6,45 +6,73 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DAY_SHORT, formatDate, formatDuration } from "@/lib/dates";
+import { cn } from "@/lib/utils";
+import { DAY_SHORT, formatDate, formatDuration, todayISO } from "@/lib/dates";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
 import { FocusBadge } from "./FocusBadge";
-import { isScheduled } from "./schedule";
+import { isUnscheduled, taskStatus } from "./schedule";
+import { taskAreaColor, taskAreaTint } from "./task-color";
 import type { Task } from "./types";
+
+const short = (d: string) => formatDate(d, { day: "numeric", month: "short" });
 
 function repeatLabel(t: Task) {
   if (t.repeat === "daily") return "Daily";
-  if (t.repeat === "weekdays") return "Weekdays";
   if (t.repeat === "days")
-    return [...t.days]
+    return `Weekly · ${[...t.days]
       .sort()
       .map((d) => DAY_SHORT[d])
-      .join(", ");
+      .join(", ")}`;
   return t.date ? formatDate(t.date, { weekday: "short", day: "2-digit", month: "short" }) : null;
 }
 
 interface Props {
   task: Task;
+  /** Week being viewed (used for recurring-task progress) */
+  weekStart?: string;
   onEdit: () => void;
   onSchedule: () => void;
   onDelete: () => void;
 }
 
-export function TaskCard({ task, onEdit, onSchedule, onDelete }: Props) {
+export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Props) {
   const { settings } = useSettings();
   const area = settings.lifeAreas.find((a) => a.id === task.lifeAreaId);
-  const scheduled = isScheduled(task);
+  const areaColor = taskAreaColor(settings.lifeAreas, task.lifeAreaId);
+  const unscheduled = isUnscheduled(task);
   const when = repeatLabel(task);
+  const status = taskStatus(task, todayISO(), weekStart);
+  const completed = !!status.completedOn;
 
   return (
-    <div className="group flex items-start gap-3 rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+    <div
+      className={cn(
+        "group flex items-start gap-3 rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft",
+        completed && "opacity-70",
+        status.dueOn && "border-destructive/40",
+      )}
+    >
+      <div
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl border"
+        style={{
+          backgroundColor: taskAreaTint(settings.lifeAreas, task.lifeAreaId, 18),
+          borderColor: areaColor,
+          color: areaColor,
+        }}
+      >
         <LifeAreaIcon icon={area?.icon} className="size-5" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="truncate font-sans text-base font-semibold">{task.title}</h3>
+          <h3
+            className={cn(
+              "truncate font-sans text-base font-semibold",
+              completed && "line-through",
+            )}
+          >
+            {task.title}
+          </h3>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -72,6 +100,37 @@ export function TaskCard({ task, onEdit, onSchedule, onDelete }: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Status */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          {status.completedOn && (
+            <span className="rounded-full bg-success/15 px-2 py-0.5 font-semibold text-success">
+              Completed · {short(status.completedOn)}
+            </span>
+          )}
+          {status.partial && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary">
+              In progress · {status.partial.pct}%
+              {status.partial.startedAt && ` · started ${short(status.partial.startedAt)}`}
+            </span>
+          )}
+          {status.dueOn && (
+            <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
+              Due · scheduled {short(status.dueOn)}
+            </span>
+          )}
+          {task.unexpected && (
+            <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
+              Unexpected
+            </span>
+          )}
+          {status.occurrences ? (
+            <span className="rounded-full bg-secondary px-2 py-0.5 font-semibold text-secondary-foreground">
+              {status.doneCount}/{status.occurrences} done this week
+            </span>
+          ) : null}
+        </div>
+
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="font-semibold text-foreground">{formatDuration(task.duration)}</span>
           <FocusBadge focus={task.focus} />
@@ -83,7 +142,7 @@ export function TaskCard({ task, onEdit, onSchedule, onDelete }: Props) {
         {task.notes && (
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{task.notes}</p>
         )}
-        {!scheduled && (
+        {unscheduled && (
           <Button variant="outline" size="sm" className="mt-3 h-8" onClick={onSchedule}>
             <CalendarClock /> Schedule
           </Button>

@@ -2,6 +2,8 @@ export interface LifeArea {
   id: string;
   name: string;
   icon: string;
+  /** Hex color used for this area's tasks everywhere in the app */
+  color: string;
 }
 
 /** 0 = Sunday … 6 = Saturday */
@@ -43,10 +45,10 @@ export const DEFAULT_SETTINGS: Settings = {
   notesEnabled: true,
   theme: "light",
   lifeAreas: [
-    { id: "work", name: "Work", icon: "briefcase" },
-    { id: "fitness", name: "Fitness", icon: "dumbbell" },
-    { id: "study", name: "Study", icon: "graduation-cap" },
-    { id: "personal", name: "Personal", icon: "heart" },
+    { id: "work", name: "Work", icon: "briefcase", color: "#2f80ed" },
+    { id: "fitness", name: "Fitness", icon: "dumbbell", color: "#27ae60" },
+    { id: "study", name: "Study", icon: "graduation-cap", color: "#9b51e0" },
+    { id: "personal", name: "Personal", icon: "heart", color: "#ec4899" },
   ],
 };
 

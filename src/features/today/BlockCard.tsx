@@ -1,23 +1,36 @@
-import { Check, Play } from "lucide-react";
+import { Check, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatClock, formatDuration, minToTime } from "@/lib/dates";
+import { formatClock, formatDate, formatDuration, minToTime } from "@/lib/dates";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
-import { FOCUS_BG, FocusBadge } from "@/features/tasks/FocusBadge";
-import type { Block } from "@/features/tasks/types";
+import { FocusBadge } from "@/features/tasks/FocusBadge";
+import { taskAreaColor } from "@/features/tasks/task-color";
+import { progressKey, type Block } from "@/features/tasks/types";
 
 interface Props {
   block: Block;
   onStart: () => void;
   onToggle: () => void;
+  /** Discard saved partial progress */
+  onReset: () => void;
 }
 
-export function BlockCard({ block, onStart, onToggle }: Props) {
+export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
   const { settings } = useSettings();
   const { task, done, unscheduled } = block;
   const area = settings.lifeAreas.find((a) => a.id === task.lifeAreaId);
+  const areaColor = taskAreaColor(settings.lifeAreas, task.lifeAreaId);
   const timed = !unscheduled && task.startTime;
+
+  // Partial progress for this occurrence
+  const prog = task.progress?.[progressKey(block)];
+  const totalSec = Math.max(prog?.total ?? 0, task.duration * 60);
+  const elapsedSec = !done && prog ? Math.min(prog.elapsed, totalSec) : 0;
+  const partial = elapsedSec > 0;
+  const pct = Math.round((elapsedSec / totalSec) * 100);
+  const finishedSession = partial && elapsedSec >= totalSec;
+  const mins = (sec: number) => Math.round(sec / 60);
 
   return (
     <div
@@ -26,16 +39,29 @@ export function BlockCard({ block, onStart, onToggle }: Props) {
         done && "opacity-60",
         task.unexpected && "border-destructive/40",
         unscheduled && "border-dashed",
+        block.overdue && !done && "border-focus-medium/60",
       )}
     >
       <span
-        className={cn(
-          "absolute inset-y-0 left-0 w-1.5",
-          task.unexpected ? "bg-destructive" : FOCUS_BG[task.focus],
-        )}
+        className={cn("absolute inset-y-0 left-0 w-1.5", task.unexpected && "bg-destructive")}
+        style={{ backgroundColor: task.unexpected ? undefined : areaColor }}
       />
       <div className="w-28 shrink-0">
-        {timed ? (
+        {block.overdue && task.date ? (
+          <>
+            <div className="text-xs font-semibold uppercase tracking-wider text-destructive">
+              Overdue
+            </div>
+            <div className="font-display text-xl">
+              {formatDate(task.date, { weekday: "short", day: "numeric", month: "short" })}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {task.startTime
+                ? `was ${formatClock(task.startTime, settings.clockFormat)}`
+                : formatDuration(task.duration)}
+            </div>
+          </>
+        ) : timed ? (
           <>
             <div className="font-display text-2xl tabular-nums">
               {formatClock(minToTime(block.start), settings.clockFormat)}
@@ -47,7 +73,7 @@ export function BlockCard({ block, onStart, onToggle }: Props) {
         ) : (
           <>
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {task.openEnded ? "Open-ended" : "Unscheduled"}
+              {unscheduled ? "Unscheduled" : "No time set"}
             </div>
             <div className="font-display text-xl">{formatDuration(task.duration)}</div>
           </>
@@ -62,17 +88,22 @@ export function BlockCard({ block, onStart, onToggle }: Props) {
             {formatDuration(task.duration)}
           </span>
           <FocusBadge focus={task.focus} />
+          {block.overdue && !done && (
+            <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
+              Overdue
+            </span>
+          )}
+          {partial && (
+            <span className="rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary">
+              In progress · {pct}%
+            </span>
+          )}
           {task.unexpected && (
             <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
               Unexpected
             </span>
           )}
-          {task.openEnded && (
-            <span className="rounded-full bg-accent px-2 py-0.5 font-semibold text-accent-foreground">
-              Any day
-            </span>
-          )}
-          {unscheduled && !task.openEnded && (
+          {unscheduled && (
             <span className="rounded-full border border-dashed px-2 py-0.5 font-semibold">
               Unscheduled
             </span>
@@ -84,11 +115,39 @@ export function BlockCard({ block, onStart, onToggle }: Props) {
             </span>
           )}
         </div>
+        {partial && (
+          <div className="mt-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatDuration(mins(elapsedSec))} done ·{" "}
+              {formatDuration(mins(totalSec - elapsedSec))} left
+            </p>
+          </div>
+        )}
       </div>
       <div className="flex gap-2">
-        {!done && timed && (
+        {!done && (
           <Button size="sm" className="rounded-full" onClick={onStart}>
-            <Play /> Start
+            <Play /> {finishedSession ? "Finish" : partial ? "Resume" : "Start"}
+          </Button>
+        )}
+        {partial && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 rounded-full"
+            aria-label="Reset progress"
+            title="Reset progress"
+            onClick={() => {
+              if (window.confirm("Reset progress on this task and start over?")) onReset();
+            }}
+          >
+            <RotateCcw />
           </Button>
         )}
         <Button

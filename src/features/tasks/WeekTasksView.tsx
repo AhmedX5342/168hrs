@@ -17,7 +17,7 @@ import { addDays, formatDate } from "@/lib/dates";
 import { toast } from "@/lib/toast";
 import { useWeeks } from "@/features/weeks/use-weeks";
 import { useTasks } from "./use-tasks";
-import { isScheduled, tasksForWeek } from "./schedule";
+import { isUnscheduled, tasksForWeek } from "./schedule";
 import { TaskCard } from "./TaskCard";
 import { TaskFormDialog } from "./TaskFormDialog";
 import { ScheduleDialog } from "./ScheduleDialog";
@@ -68,12 +68,19 @@ export function WeekTasksView({ weekStart }: { weekStart: string }) {
   const [deleting, setDeleting] = useState<Task | null>(null);
 
   const list = tasksForWeek(tasks, weekStart);
-  const unscheduled = list.filter((t) => !isScheduled(t));
-  const oneOff = list.filter((t) => t.repeat === "once" && isScheduled(t));
-  const recurring = list.filter((t) => t.repeat !== "once" && isScheduled(t));
+  const unscheduled = list.filter(isUnscheduled);
+  const oneOff = list
+    .filter((t) => t.repeat === "once" && !isUnscheduled(t))
+    .sort(
+      (a, b) =>
+        (a.date ?? "").localeCompare(b.date ?? "") ||
+        (a.startTime ?? "").localeCompare(b.startTime ?? ""),
+    );
+  const recurring = list.filter((t) => t.repeat !== "once");
 
   const actions = (t: Task) => ({
     task: t,
+    weekStart,
     onEdit: () => {
       setEditing(t);
       setFormOpen(true);
@@ -120,7 +127,7 @@ export function WeekTasksView({ weekStart }: { weekStart: string }) {
         <Section
           title="Unscheduled inventory"
           tasks={unscheduled}
-          empty="Everything has a slot. Nice."
+          empty="Every task has a day. Nice."
           actions={actions}
         />
         <Section

@@ -45,7 +45,7 @@ export const minToTime = (min: number) => {
 export const formatClock = (time: string | number, format: "12" | "24") => {
   const min = typeof time === "number" ? time : timeToMin(time);
   const h24 = Math.floor((((min % 1440) + 1440) % 1440) / 60);
-  const m = ((min % 1440) + 1440) % 1440 % 60;
+  const m = (((min % 1440) + 1440) % 1440) % 60;
   if (format === "24") return `${pad(h24)}:${pad(m)}`;
   const am = h24 < 12;
   const h12 = h24 % 12 || 12;
@@ -70,4 +70,12 @@ export const sleepDurationMin = (bed: string, wake: string) => {
 };
 
 export const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-export const DAY_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export const DAY_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];

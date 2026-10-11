@@ -1,6 +1,24 @@
 import {
-  Briefcase, Dumbbell, GraduationCap, Heart, Laptop, BookOpen, Music, Palette, Home, Users,
-  Wallet, Leaf, Brain, Code, Camera, Coffee, Plane, Sparkles, type LucideIcon,
+  Briefcase,
+  Dumbbell,
+  GraduationCap,
+  Heart,
+  Laptop,
+  BookOpen,
+  Music,
+  Palette,
+  Home,
+  Users,
+  Wallet,
+  Leaf,
+  Brain,
+  Code,
+  Camera,
+  Coffee,
+  Plane,
+  Dot,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 
 export const LIFE_AREA_ICONS: Record<string, LucideIcon> = {
@@ -24,7 +42,13 @@ export const LIFE_AREA_ICONS: Record<string, LucideIcon> = {
   sparkles: Sparkles,
 };
 
-export function LifeAreaIcon({ icon, className }: { icon?: string | undefined; className?: string }) {
-  const Icon = (icon && LIFE_AREA_ICONS[icon]) || Sparkles;
+export function LifeAreaIcon({
+  icon,
+  className,
+}: {
+  icon?: string | undefined;
+  className?: string;
+}) {
+  const Icon = (icon && LIFE_AREA_ICONS[icon]) || Dot;
   return <Icon className={className} />;
 }

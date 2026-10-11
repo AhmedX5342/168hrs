@@ -27,6 +27,7 @@ import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
 import { useTasks } from "./use-tasks";
+import { DAY_MIN, dayLoadMin, firstFullDay } from "./schedule";
 import type { Task } from "./types";
 
 const NONE = "__none";
@@ -37,13 +38,11 @@ const schema = z
     hours: z.coerce.number().min(0.25, "At least 15 minutes").max(24, "Max 24 hours"),
     focus: z.enum(["deep", "medium", "light"]),
     lifeAreaId: z.string(),
-    repeat: z.enum(["once", "daily", "weekdays", "days"]),
+    repeat: z.enum(["once", "daily", "days"]),
     days: z.array(z.number()),
     date: z.string(),
     startTime: z.string(),
     notes: z.string().max(500).optional(),
-    openEnded: z.boolean(),
-    sessions: z.coerce.number().min(1).max(14),
     unexpected: z.boolean(),
   })
   .refine((v) => v.repeat !== "days" || v.days.length > 0, {
@@ -89,12 +88,13 @@ export function TaskFormDialog({
   unexpected = false,
 }: Props) {
   const { settings } = useSettings();
-  const { addTask, updateTask } = useTasks();
+  const { tasks, addTask, updateTask } = useTasks();
   const dates = weekDates(weekStart);
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema) as never });
   const repeat = form.watch("repeat");
-  const openEnded = form.watch("openEnded");
+  const hoursValue = Number(form.watch("hours")) || 0;
+  const durationMin = Math.round(hoursValue * 60);
   const errors = form.formState.errors;
 
   useEffect(() => {
@@ -109,8 +109,6 @@ export function TaskFormDialog({
       date: task?.date ?? defaultDate ?? NONE,
       startTime: task?.startTime ?? "",
       notes: task?.notes ?? "",
-      openEnded: task?.openEnded ?? false,
-      sessions: 1,
       unexpected: task?.unexpected ?? unexpected,
     });
   }, [open, task, defaultDate, unexpected, form]);
@@ -124,42 +122,27 @@ export function TaskFormDialog({
       lifeAreaId: v.lifeAreaId === NONE ? undefined : v.lifeAreaId,
       notes: v.notes ?? "",
       unexpected: v.unexpected,
+      repeat: v.repeat,
+      days: v.repeat === "days" ? v.days : [],
+      date: v.repeat === "once" && v.date !== NONE ? v.date : null,
+      startTime: v.startTime || null,
     };
 
+    // A day can't hold more than 24h of scheduled work
+    const full = firstFullDay(tasks, base, task?.id);
+    if (full) {
+      toast.error(
+        "That day is full",
+        `${formatDate(full, { weekday: "long", day: "numeric", month: "short" })} can't fit another ${v.hours}h — it would exceed 24h.`,
+      );
+      return;
+    }
+
     if (task) {
-      await updateTask(task.id, {
-        ...base,
-        repeat: v.openEnded ? "once" : v.repeat,
-        days: v.repeat === "days" ? v.days : [],
-        date: v.openEnded ? null : v.repeat === "once" && v.date !== NONE ? v.date : null,
-        startTime: v.openEnded ? null : v.startTime || null,
-        openEnded: v.openEnded,
-      });
+      await updateTask(task.id, base);
       toast.success("Task updated", v.title);
-    } else if (v.openEnded && v.sessions > 1) {
-      const groupId = crypto.randomUUID();
-      for (let i = 0; i < v.sessions; i++) {
-        await addTask({
-          ...base,
-          title: v.sessions > 1 ? `${v.title} (${i + 1}/${v.sessions})` : v.title,
-          repeat: "once",
-          days: [],
-          date: null,
-          startTime: null,
-          openEnded: true,
-          groupId,
-        });
-      }
-      toast.success(`${v.sessions} open-ended sessions added`, v.title);
     } else {
-      await addTask({
-        ...base,
-        repeat: v.openEnded ? "once" : v.repeat,
-        days: v.repeat === "days" ? v.days : [],
-        date: v.openEnded ? null : v.repeat === "once" && v.date !== NONE ? v.date : null,
-        startTime: v.openEnded ? null : v.startTime || null,
-        openEnded: v.openEnded,
-      });
+      await addTask(base);
       toast.success(v.unexpected ? "Unexpected task added" : "Task added", v.title);
     }
     onOpenChange(false);
@@ -227,26 +210,6 @@ export function TaskFormDialog({
 
           <div className="flex items-center justify-between rounded-xl border px-3 py-2">
             <div>
-              <div className="text-sm font-medium">Open-ended this week</div>
-              <p className="text-xs text-muted-foreground">Complete any day</p>
-            </div>
-            <Controller
-              control={form.control}
-              name="openEnded"
-              render={({ field }) => (
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              )}
-            />
-          </div>
-
-          {openEnded && !task && (
-            <Field label="Number of sessions">
-              <Input type="number" min={1} max={14} {...form.register("sessions")} />
-            </Field>
-          )}
-
-          <div className="flex items-center justify-between rounded-xl border px-3 py-2">
-            <div>
               <div className="text-sm font-medium">Unexpected</div>
               <p className="text-xs text-muted-foreground">Came up outside the plan</p>
             </div>
@@ -259,88 +222,87 @@ export function TaskFormDialog({
             />
           </div>
 
-          {!openEnded && (
-            <>
-              <Field label="Repeat">
+          <Field label="Repeat">
+            <Controller
+              control={form.control}
+              name="repeat"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="once">One-time</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="days">Weekly (choose days)</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
+          {repeat === "days" && (
+            <Field label="Days" error={errors.days?.message}>
+              <Controller
+                control={form.control}
+                name="days"
+                render={({ field }) => (
+                  <ToggleGroup
+                    type="multiple"
+                    variant="outline"
+                    className="flex-wrap justify-start"
+                    value={field.value.map(String)}
+                    onValueChange={(v) => field.onChange(v.map(Number))}
+                  >
+                    {dates.map((d) => (
+                      <ToggleGroupItem
+                        key={d}
+                        value={String(dayOfWeek(d))}
+                        className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                      >
+                        {DAY_SHORT[dayOfWeek(d)]}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                )}
+              />
+            </Field>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {repeat === "once" && (
+              <Field label="Day">
                 <Controller
                   control={form.control}
-                  name="repeat"
+                  name="date"
                   render={({ field }) => (
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="once">One-time</SelectItem>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekdays">Weekdays</SelectItem>
-                        <SelectItem value="days">Specific days</SelectItem>
+                        <SelectItem value={NONE}>Unscheduled</SelectItem>
+                        {dates.map((d) => {
+                          const full = dayLoadMin(tasks, d, task?.id) + durationMin > DAY_MIN;
+                          return (
+                            <SelectItem key={d} value={d} disabled={full}>
+                              {formatDate(d, {
+                                weekday: "short",
+                                day: "2-digit",
+                                month: "short",
+                              })}
+                              {full ? " — full" : ""}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                   )}
                 />
               </Field>
-              {repeat === "days" && (
-                <Field label="Days" error={errors.days?.message}>
-                  <Controller
-                    control={form.control}
-                    name="days"
-                    render={({ field }) => (
-                      <ToggleGroup
-                        type="multiple"
-                        variant="outline"
-                        className="flex-wrap justify-start"
-                        value={field.value.map(String)}
-                        onValueChange={(v) => field.onChange(v.map(Number))}
-                      >
-                        {dates.map((d) => (
-                          <ToggleGroupItem
-                            key={d}
-                            value={String(dayOfWeek(d))}
-                            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
-                          >
-                            {DAY_SHORT[dayOfWeek(d)]}
-                          </ToggleGroupItem>
-                        ))}
-                      </ToggleGroup>
-                    )}
-                  />
-                </Field>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                {repeat === "once" && (
-                  <Field label="Day">
-                    <Controller
-                      control={form.control}
-                      name="date"
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NONE}>Unscheduled</SelectItem>
-                            {dates.map((d) => (
-                              <SelectItem key={d} value={d}>
-                                {formatDate(d, {
-                                  weekday: "short",
-                                  day: "2-digit",
-                                  month: "short",
-                                })}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                  </Field>
-                )}
-                <Field label="Start time (optional)">
-                  <Input type="time" {...form.register("startTime")} />
-                </Field>
-              </div>
-            </>
-          )}
+            )}
+            <Field label="Start time (optional)">
+              <Input type="time" {...form.register("startTime")} />
+            </Field>
+          </div>
 
           <Field label="Notes (optional)">
             <Textarea rows={2} {...form.register("notes")} />
