@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CalendarDays, Moon } from "lucide-react";
+import { AlertTriangle, CalendarDays, ChevronDown, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -12,17 +12,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatDate, formatDuration, todayISO, weekDates, startOfWeek } from "@/lib/dates";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { useSettings } from "@/features/settings/use-settings";
 import { useTasks } from "@/features/tasks/use-tasks";
 import { blocksForDate, remainingWorkMin } from "@/features/tasks/schedule";
@@ -62,9 +55,45 @@ function Dur({ min, unitCls }: { min: number; unitCls?: string }) {
   );
 }
 
+function Section({
+  title,
+  count,
+  defaultOpen = true,
+  children,
+  empty,
+}: {
+  title: string;
+  count: number;
+  defaultOpen?: boolean;
+  children: ReactNode;
+  empty?: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="mb-3 flex w-full items-center gap-2 text-left text-2xl font-display"
+        >
+          <ChevronDown
+            className={cn(
+              "size-5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+          <span>{title}</span>
+          <span className="font-sans text-sm text-muted-foreground">{count}</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3">{count > 0 ? children : empty}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 export function TodayView({ date }: { date: string }) {
   const { settings, weeklySleepHours } = useSettings();
-  const { tasks, setCompleted, updateTask, setProgress, moveToToday, moveToTomorrow } = useTasks();
+  const { tasks, setCompleted, updateTask, setProgress } = useTasks();
   const sleep = useSleep();
   const [confirm, setConfirm] = useState<Session | null>(null);
   const [active, setActive] = useState<Session | null>(null);
@@ -77,13 +106,19 @@ export function TodayView({ date }: { date: string }) {
     showUnscheduled: settings.showUnscheduled,
     weekStart,
     includeOverdue: isToday,
-    // Weekly tasks: completed ones show on their completion day,
-    // pending ones show on today
     includeWeekly: true,
     includeWeeklyPending: isToday,
   });
-  const planned = blocks.reduce((s, b) => s + b.task.duration, 0);
-  const done = blocks.filter((b) => b.done).reduce((s, b) => s + b.task.duration, 0);
+
+  // Sections
+  const scheduledBlocks = blocks.filter((b) => !b.unscheduled);
+  const unscheduledBlocks = blocks.filter((b) => b.unscheduled);
+  // Planned today card: only tasks dated to this day (not unscheduled, weekly, or overdue)
+  const plannedTodayMin = blocks
+    .filter((b) => !b.unscheduled && !b.weekly && !b.overdue)
+    .reduce((s, b) => s + b.task.duration, 0);
+  const plannedUnscheduledMin = unscheduledBlocks.reduce((s, b) => s + b.task.duration, 0);
+  const doneMin = blocks.filter((b) => b.done).reduce((s, b) => s + b.task.duration, 0);
 
   const remainingMin = remainingWorkMin(tasks, weekStart, weekDays);
   const capacityMin = Math.round((168 - weeklySleepHours) * 60);
@@ -93,42 +128,47 @@ export function TodayView({ date }: { date: string }) {
 
   const resumeInfo = confirm?.task.progress?.[confirm.key];
 
+  /**
+   * Mark complete/incomplete. Unscheduled one-time tasks (no date) get their
+   * date set to the completion day so they land in that day's Completed section.
+   * Time is left null.
+   */
   const complete = async (task: Task, key: string, value = true) => {
     if (!value && task.repeat === "once") {
-      // A one-time task may have been finished on another day — un-complete it fully
       await updateTask(task.id, { completions: [] });
+    } else if (value && task.repeat === "once" && !task.date) {
+      await updateTask(task.id, {
+        date,
+        completions: Array.from(new Set([...task.completions, date])),
+      });
     } else {
       await setCompleted(task.id, date, value);
     }
-    if (value) await setProgress(task.id, key, null); // finished — nothing left to resume
+    if (value) await setProgress(task.id, key, null);
     if (value) toast.success("Block completed", `${task.title} · ${formatDuration(task.duration)}`);
   };
 
-  const incompleteBlocks = blocks.filter((b) => !b.done);
+  const scheduledIncomplete = scheduledBlocks.filter((b) => !b.done);
+  const unscheduledIncomplete = unscheduledBlocks.filter((b) => !b.done);
   const completedBlocks = blocks.filter((b) => b.done);
 
   const renderBlock = (b: Block, i: number) => (
     <div
-      key={`${b.task.id}-${b.unscheduled ? "u" : "s"}`}
+      key={`${b.task.id}-${b.unscheduled ? "u" : "s"}-${b.overdue ? "o" : "n"}`}
       className="animate-fade-up"
-      style={{ animationDelay: `${i * 60}ms` }}
+      style={{ animationDelay: `${i * 40}ms` }}
     >
       <BlockCard
         block={b}
         onStart={() => setConfirm({ task: b.task, key: progressKey(b) })}
-        onToggle={() => complete(b.task, progressKey(b), !b.done)}
-        onMoveToday={() => {
-          void moveToToday(b.task.id);
-          toast.success("Moved to today");
-        }}
-        onMoveTomorrow={() => {
-          void moveToTomorrow(b.task.id);
-          toast.success("Moved to tomorrow");
-        }}
+        onToggle={() => void complete(b.task, progressKey(b), !b.done)}
         onReset={() => void setProgress(b.task.id, progressKey(b), null)}
       />
     </div>
   );
+
+  const hasAny =
+    scheduledIncomplete.length + unscheduledIncomplete.length + completedBlocks.length > 0;
 
   return (
     <>
@@ -145,35 +185,30 @@ export function TodayView({ date }: { date: string }) {
         <div className="flex flex-wrap items-center gap-3">{isToday && <LiveClock />}</div>
       </header>
 
-      {isToday && sleep.todayLog && sleep.actualSleepMin != null && (
-        <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-sm">
-          <Moon className="size-4 text-sleep" />
-          <span>
-            Slept <strong>{formatDuration(sleep.actualSleepMin)}</strong>
-            {sleep.wastedMin > 0 && (
-              <span className="text-muted-foreground">
-                {" "}
-                ·{" "}
-                <span className="text-destructive font-medium">
-                  {formatDuration(sleep.wastedMin)} over ideal
-                </span>
-              </span>
-            )}
-          </span>
-        </div>
-      )}
-
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:max-w-lg sm:grid-cols-2">
+      <div
+        className={cn(
+          "mb-6 grid gap-3 sm:max-w-2xl",
+          settings.showUnscheduled ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2",
+        )}
+      >
         <div className="rounded-2xl border bg-card p-4">
           <div className="text-xs text-muted-foreground">Planned today</div>
           <div className="font-display text-3xl">
-            <Dur min={planned} unitCls="text-lg text-muted-foreground" />
+            <Dur min={plannedTodayMin} unitCls="text-lg text-muted-foreground" />
           </div>
         </div>
+        {settings.showUnscheduled && (
+          <div className="rounded-2xl border border-dashed bg-card p-4">
+            <div className="text-xs text-muted-foreground">Unscheduled</div>
+            <div className="font-display text-3xl">
+              <Dur min={plannedUnscheduledMin} unitCls="text-lg text-muted-foreground" />
+            </div>
+          </div>
+        )}
         <div className="rounded-2xl bg-gradient-primary p-4 text-primary-foreground">
           <div className="text-xs opacity-80">Done</div>
           <div className="font-display text-3xl">
-            <Dur min={done} unitCls="text-lg opacity-70" />
+            <Dur min={doneMin} unitCls="text-lg opacity-70" />
           </div>
         </div>
       </div>
@@ -211,7 +246,7 @@ export function TodayView({ date }: { date: string }) {
         </div>
       )}
 
-      {blocks.length === 0 ? (
+      {!hasAny ? (
         <div className="flex flex-col items-center rounded-3xl border border-dashed px-6 py-16 text-center">
           <p className="font-display text-3xl">Nothing scheduled.</p>
           <p className="mt-2 text-muted-foreground">Plan the week.</p>
@@ -222,32 +257,29 @@ export function TodayView({ date }: { date: string }) {
           </Button>
         </div>
       ) : (
-        <div className="space-y-10">
-          <section>
-            <h2 className="mb-3 flex items-baseline gap-2 text-2xl">
-              Incomplete{" "}
-              <span className="font-sans text-sm text-muted-foreground">
-                {incompleteBlocks.length}
-              </span>
-            </h2>
-            {incompleteBlocks.length ? (
-              <div className="space-y-3">{incompleteBlocks.map(renderBlock)}</div>
-            ) : (
+        <div className="space-y-8">
+          <Section
+            title="Incomplete"
+            count={scheduledIncomplete.length}
+            empty={
               <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                Everything here is done. Nice.
+                Everything scheduled for this day is done.
               </p>
-            )}
-          </section>
+            }
+          >
+            {scheduledIncomplete.map(renderBlock)}
+          </Section>
+
+          {settings.showUnscheduled && (
+            <Section title="Unscheduled" count={unscheduledIncomplete.length} defaultOpen>
+              {unscheduledIncomplete.map(renderBlock)}
+            </Section>
+          )}
+
           {completedBlocks.length > 0 && (
-            <section>
-              <h2 className="mb-3 flex items-baseline gap-2 text-2xl">
-                Completed{" "}
-                <span className="font-sans text-sm text-muted-foreground">
-                  {completedBlocks.length}
-                </span>
-              </h2>
-              <div className="space-y-3">{completedBlocks.map(renderBlock)}</div>
-            </section>
+            <Section title="Completed" count={completedBlocks.length} defaultOpen={false}>
+              {completedBlocks.map(renderBlock)}
+            </Section>
           )}
         </div>
       )}

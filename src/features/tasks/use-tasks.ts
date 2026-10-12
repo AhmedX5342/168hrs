@@ -85,34 +85,6 @@ export function useTasks() {
     [mutate],
   );
 
-  /** Move a one-off task (or re-date) to a specific ISO day. */
-  const moveTaskToDate = useCallback(
-    (id: string, date: string) =>
-      mutate((prev) =>
-        prev.map((t) => {
-          if (t.id !== id) return t;
-          // Keep time if set; mark as belonging to the week of that date via weekStart if once
-          return {
-            ...t,
-            date,
-            // once tasks often key off weekStart for lists
-            weekStart: t.repeat === "once" ? t.weekStart : t.weekStart,
-          };
-        }),
-      ),
-    [mutate],
-  );
-
-  const moveToToday = useCallback(
-    (id: string) => moveTaskToDate(id, todayISO()),
-    [moveTaskToDate],
-  );
-
-  const moveToTomorrow = useCallback(
-    (id: string) => moveTaskToDate(id, addDays(todayISO(), 1)),
-    [moveTaskToDate],
-  );
-
   /**
    * Carry unfinished one-time / weekly tasks from past weeks into `newWeekStart`.
    * - once: incomplete → weekStart = new, date stays (overdue) or null stays unscheduled
@@ -148,9 +120,6 @@ export function useTasks() {
     deleteTask,
     setCompleted,
     setProgress,
-    moveTaskToDate,
-    moveToToday,
-    moveToTomorrow,
     carryUnfinishedIntoWeek,
   };
 }

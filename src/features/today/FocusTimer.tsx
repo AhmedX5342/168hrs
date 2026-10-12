@@ -43,7 +43,6 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
-  // Keep screen on while a session is actively running
   useKeepAwake(running && !finished);
 
   const persist = () => {
@@ -54,7 +53,20 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     });
   };
 
-  // Countdown tick
+  // Lock background page scroll while the timer is open (fixes long empty scroll on mobile)
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    // Jump viewport to top so fixed overlay aligns with visual viewport
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.style.overflow = prev;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, []);
+
   useEffect(() => {
     if (!running || finished) return;
     const endAt = Date.now() + remaining;
@@ -106,7 +118,6 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cancel notification on unmount
   useEffect(() => () => void cancelTimerEnd(), []);
 
   const R = 120;
@@ -136,18 +147,21 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-10 bg-background px-6 animate-scale-in">
-      <div className="max-w-full text-center">
+    <div
+      className="fixed inset-0 z-50 flex h-[100dvh] max-h-[100dvh] flex-col items-center justify-center gap-6 overflow-hidden overscroll-none bg-background px-6 py-8 animate-scale-in sm:gap-10"
+      style={{ top: 0, left: 0, right: 0, bottom: 0 }}
+    >
+      <div className="max-w-full shrink-0 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
           {initial ? "Picking back up" : "Locked in"}
         </p>
-        <h2 className="mt-2 text-4xl [overflow-wrap:anywhere] sm:text-5xl">{task.title}</h2>
+        <h2 className="mt-2 text-3xl [overflow-wrap:anywhere] sm:text-5xl">{task.title}</h2>
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <FocusBadge focus={task.focus} /> {formatDuration(total / 60_000)}
         </div>
       </div>
 
-      <div className="relative size-72 sm:size-80">
+      <div className="relative size-56 shrink-0 sm:size-80">
         <svg viewBox="0 0 280 280" className="size-full -rotate-90">
           <circle cx="140" cy="140" r={R} className="fill-none stroke-muted" strokeWidth="10" />
           <circle
@@ -163,10 +177,14 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {finished ? (
-            <span className="font-display text-4xl text-gradient-primary">Time&apos;s up</span>
+            <span className="font-display text-3xl text-gradient-primary sm:text-4xl">
+              Time&apos;s up
+            </span>
           ) : (
             <>
-              <span className="font-display text-6xl tabular-nums">{format(remaining)}</span>
+              <span className="font-display text-5xl tabular-nums sm:text-6xl">
+                {format(remaining)}
+              </span>
               <span className="mt-1 text-xs uppercase tracking-widest text-muted-foreground">
                 {running ? "remaining" : "paused"}
               </span>
@@ -176,7 +194,7 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
       </div>
 
       {finished ? (
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex shrink-0 flex-wrap justify-center gap-3">
           <Button size="lg" className="rounded-full" onClick={onComplete}>
             <Check /> Task completed
           </Button>
@@ -185,7 +203,7 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
           </Button>
         </div>
       ) : (
-        <div className="flex flex-wrap justify-center gap-3">
+        <div className="flex shrink-0 flex-wrap justify-center gap-3">
           <Button size="lg" className="rounded-full" onClick={onComplete}>
             <Check /> Complete
           </Button>

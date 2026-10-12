@@ -344,11 +344,29 @@ export function TaskFormDialog({
           <Field label="Notes (optional)">
             <Textarea rows={2} {...form.register("notes")} />
           </Field>
-          <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">{task ? "Save" : "Add task"}</Button>
+          <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {task &&
+                task.repeat === "once" &&
+                (Boolean(task.date) || form.watch("date") !== NONE) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      form.setValue("date", NONE);
+                      form.setValue("startTime", "");
+                    }}
+                  >
+                    Unschedule
+                  </Button>
+                )}
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">{task ? "Save" : "Add task"}</Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
