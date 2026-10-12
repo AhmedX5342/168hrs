@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { STORAGE_KEYS } from "@/lib/storage";
 import { useStored } from "@/lib/use-stored";
-import { todayISO } from "@/lib/dates";
+import { addDays, todayISO } from "@/lib/dates";
 import type { RepeatType, Task, TaskProgress } from "./types";
 
 export type TaskInput = Omit<Task, "id" | "completions" | "createdAt">;
@@ -28,7 +28,6 @@ export function useTasks() {
   const { data: raw, update } = useStored<Task[]>(STORAGE_KEYS.tasks, []);
   const tasks = useMemo(() => raw.map(normalizeTask), [raw]);
 
-  /** Every write also persists the normalized shape. */
   const mutate = useCallback(
     (fn: (prev: Task[]) => Task[]) => update((prev) => fn(prev.map(normalizeTask))),
     [update],
@@ -68,7 +67,6 @@ export function useTasks() {
     [mutate],
   );
 
-  /** Save (or clear, with null / zero elapsed) partial progress for a task under a key. */
   const setProgress = useCallback(
     (id: string, key: string, p: TaskProgress | null) =>
       mutate((prev) =>
@@ -87,5 +85,72 @@ export function useTasks() {
     [mutate],
   );
 
-  return { tasks, addTask, updateTask, deleteTask, setCompleted, setProgress };
+  /** Move a one-off task (or re-date) to a specific ISO day. */
+  const moveTaskToDate = useCallback(
+    (id: string, date: string) =>
+      mutate((prev) =>
+        prev.map((t) => {
+          if (t.id !== id) return t;
+          // Keep time if set; mark as belonging to the week of that date via weekStart if once
+          return {
+            ...t,
+            date,
+            // once tasks often key off weekStart for lists
+            weekStart: t.repeat === "once" ? t.weekStart : t.weekStart,
+          };
+        }),
+      ),
+    [mutate],
+  );
+
+  const moveToToday = useCallback(
+    (id: string) => moveTaskToDate(id, todayISO()),
+    [moveTaskToDate],
+  );
+
+  const moveToTomorrow = useCallback(
+    (id: string) => moveTaskToDate(id, addDays(todayISO(), 1)),
+    [moveTaskToDate],
+  );
+
+  /**
+   * Carry unfinished one-time / weekly tasks from past weeks into `newWeekStart`.
+   * - once: incomplete → weekStart = new, date stays (overdue) or null stays unscheduled
+   * - weekly: incomplete for that old week → update weekStart so they appear this week
+   */
+  const carryUnfinishedIntoWeek = useCallback(
+    (newWeekStart: string, previousWeekStart: string) =>
+      mutate((prev) =>
+        prev.map((t) => {
+          if (t.weekStart !== previousWeekStart) return t;
+          if (t.repeat === "once") {
+            if (t.completions.length > 0) return t;
+            return { ...t, weekStart: newWeekStart };
+          }
+          if (t.repeat === "weekly") {
+            // completed for previous week only if completion falls in that week range
+            const doneThatWeek = t.completions.some(
+              (d) => d >= previousWeekStart && d < addDays(previousWeekStart, 7),
+            );
+            if (doneThatWeek) return t;
+            return { ...t, weekStart: newWeekStart };
+          }
+          return t;
+        }),
+      ),
+    [mutate],
+  );
+
+  return {
+    tasks,
+    addTask,
+    updateTask,
+    deleteTask,
+    setCompleted,
+    setProgress,
+    moveTaskToDate,
+    moveToToday,
+    moveToTomorrow,
+    carryUnfinishedIntoWeek,
+  };
 }

@@ -1,6 +1,8 @@
+import { db } from "./db";
+
 /**
- * Notes live in localStorage (~5MB quota), so attached images are downscaled
- * and re-encoded as JPEG before being stored as a data URL.
+ * Note images are downscaled and re-encoded as JPEG, then stored as blobs in IndexedDB.
+ * Notes only keep the returned image id.
  */
 function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -18,7 +20,7 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-export async function fileToDataUrl(file: File, maxDim = 1280, quality = 0.82): Promise<string> {
+async function toJpegBlob(file: File, maxDim = 2048, quality = 0.86): Promise<Blob> {
   if (!file.type.startsWith("image/")) throw new Error("Please choose an image file");
   const img = await loadImage(file);
   const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
@@ -34,5 +36,20 @@ export async function fileToDataUrl(file: File, maxDim = 1280, quality = 0.82): 
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, w, h);
   ctx.drawImage(img, 0, 0, w, h);
-  return canvas.toDataURL("image/jpeg", quality);
+
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Could not process that image"))),
+      "image/jpeg",
+      quality,
+    ),
+  );
+}
+
+/** Store an image and return its id. */
+export async function saveImage(file: File): Promise<string> {
+  const blob = await toJpegBlob(file);
+  const id = crypto.randomUUID();
+  await db.images.put({ id, blob, createdAt: Date.now() });
+  return id;
 }

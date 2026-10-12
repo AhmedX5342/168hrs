@@ -64,11 +64,10 @@ function Dur({ min, unitCls }: { min: number; unitCls?: string }) {
 
 export function TodayView({ date }: { date: string }) {
   const { settings, weeklySleepHours } = useSettings();
-  const { tasks, setCompleted, updateTask, setProgress } = useTasks();
+  const { tasks, setCompleted, updateTask, setProgress, moveToToday, moveToTomorrow } = useTasks();
   const sleep = useSleep();
   const [confirm, setConfirm] = useState<Session | null>(null);
   const [active, setActive] = useState<Session | null>(null);
-  const [wakeInput, setWakeInput] = useState(settings.sleepWakeTarget);
   const [unexpectedOpen, setUnexpectedOpen] = useState(false);
 
   const weekStart = startOfWeek(date, settings.weekStartsOn);
@@ -118,15 +117,18 @@ export function TodayView({ date }: { date: string }) {
         block={b}
         onStart={() => setConfirm({ task: b.task, key: progressKey(b) })}
         onToggle={() => complete(b.task, progressKey(b), !b.done)}
+        onMoveToday={() => {
+          void moveToToday(b.task.id);
+          toast.success("Moved to today");
+        }}
+        onMoveTomorrow={() => {
+          void moveToTomorrow(b.task.id);
+          toast.success("Moved to tomorrow");
+        }}
         onReset={() => void setProgress(b.task.id, progressKey(b), null)}
       />
     </div>
   );
-
-  const submitWake = async () => {
-    await sleep.logWake(wakeInput);
-    toast.success("Wake time logged");
-  };
 
   return (
     <>
@@ -298,28 +300,6 @@ export function TodayView({ date }: { date: string }) {
         defaultDate={date}
         unexpected
       />
-
-      <Dialog open={isToday && sleep.needsWakeLog} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">
-              When did you wake up?
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Target: {settings.sleepBedtime} → {settings.sleepWakeTarget} (
-            {formatDuration(sleep.targetSleepMin)}). Anything over {settings.idealSleepHours}h
-            counts as wasted sleep.
-          </p>
-          <div className="space-y-1.5">
-            <Label>Actual wake time</Label>
-            <Input type="time" value={wakeInput} onChange={(e) => setWakeInput(e.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button onClick={() => void submitWake()}>Log wake</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

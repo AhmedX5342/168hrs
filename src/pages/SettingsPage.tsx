@@ -16,13 +16,10 @@ import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { clearAll, exportAll, importAll } from "@/lib/storage";
-import { saveJsonFile } from "@/lib/export-file";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { WEEKDAY_OPTIONS, type WeekStartDay } from "@/features/settings/types";
 import { LIFE_AREA_ICONS, LifeAreaIcon } from "@/features/life-areas/icons";
-import { AreaColorButton } from "@/features/life-areas/AreaColorButton";
-import { nextAreaColor, tint } from "@/features/life-areas/colors";
 
 export function SettingsPage() {
   const { settings, patch, weeklySleepHours } = useSettings();
@@ -30,21 +27,20 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [areaName, setAreaName] = useState("");
   const [areaIcon, setAreaIcon] = useState("sparkles");
-  const [areaColor, setAreaColor] = useState(() => nextAreaColor(settings.lifeAreas));
 
   const doExport = async () => {
-    try {
-      await saveJsonFile("168hrs-backup.json", exportAll());
-      toast.success("Data exported");
-    } catch (e) {
-      // Dismissing the share sheet counts as cancelling, not failing
-      if (e instanceof Error && /cancel/i.test(e.message)) return;
-      toast.error("Export failed", e instanceof Error ? e.message : undefined);
-    }
+    const blob = new Blob([JSON.stringify(await exportAll(), null, 2)], {
+      type: "application/json",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "168hrs-backup.json";
+    a.click();
+    toast.success("Data exported");
   };
   const doImport = async (file: File) => {
     try {
-      importAll(JSON.parse(await file.text()));
+      await importAll(JSON.parse(await file.text()));
       await qc.invalidateQueries();
       toast.success("Data imported");
     } catch {
@@ -202,23 +198,10 @@ export function SettingsPage() {
           <div className="space-y-2">
             {settings.lifeAreas.map((a) => (
               <div key={a.id} className="flex items-center gap-3 rounded-2xl border bg-card p-3">
-                <div
-                  className="flex size-9 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: tint(a.color), color: a.color }}
-                >
+                <div className="flex size-9 items-center justify-center rounded-xl bg-accent text-accent-foreground">
                   <LifeAreaIcon icon={a.icon} className="size-4" />
                 </div>
                 <span className="flex-1 font-medium">{a.name}</span>
-                <AreaColorButton
-                  color={a.color}
-                  onChange={(color) =>
-                    patch({
-                      lifeAreas: settings.lifeAreas.map((x) =>
-                        x.id === a.id ? { ...x, color } : x,
-                      ),
-                    })
-                  }
-                />
                 <Button
                   variant="ghost"
                   size="icon"
@@ -234,14 +217,11 @@ export function SettingsPage() {
           </div>
           <div className="space-y-3 rounded-2xl border border-dashed p-4">
             <Label>New life area</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="Freelance"
-                value={areaName}
-                onChange={(e) => setAreaName(e.target.value)}
-              />
-              <AreaColorButton color={areaColor} onChange={setAreaColor} />
-            </div>
+            <Input
+              placeholder="Freelance"
+              value={areaName}
+              onChange={(e) => setAreaName(e.target.value)}
+            />
             <div className="flex flex-wrap gap-2">
               {Object.keys(LIFE_AREA_ICONS).map((k) => (
                 <button
@@ -267,12 +247,12 @@ export function SettingsPage() {
                   toast.error("Give the life area a name");
                   return;
                 }
-                const next = [
-                  ...settings.lifeAreas,
-                  { id: crypto.randomUUID(), name, icon: areaIcon, color: areaColor },
-                ];
-                await patch({ lifeAreas: next });
-                setAreaColor(nextAreaColor(next));
+                await patch({
+                  lifeAreas: [
+                    ...settings.lifeAreas,
+                    { id: crypto.randomUUID(), name, icon: areaIcon },
+                  ],
+                });
                 setAreaName("");
                 toast.success("Life area added", name);
               }}
@@ -292,7 +272,7 @@ export function SettingsPage() {
           <input
             ref={fileRef}
             type="file"
-            accept="application/json,.json"
+            accept="application/json"
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -303,7 +283,7 @@ export function SettingsPage() {
             variant="destructive"
             onClick={async () => {
               if (!window.confirm("Clear all data? This cannot be undone.")) return;
-              clearAll();
+              await clearAll();
               await qc.invalidateQueries();
               toast.success("All data cleared");
             }}

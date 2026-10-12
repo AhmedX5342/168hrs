@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { initStorage } from "@/lib/storage";
 import { useSettings } from "@/features/settings/use-settings";
 import { useEnsureWeeks } from "@/features/weeks/use-weeks";
 import { Onboarding } from "@/features/onboarding/Onboarding";
@@ -34,18 +36,48 @@ function Shell({ children, className }: AppLayoutProps) {
   );
 }
 
-/** Data lives in localStorage, so the shell renders only after hydration. */
+/** Wait for Dexie migration + cache preload before rendering app data. */
 function AppLayoutComponent(props: AppLayoutProps) {
-  const [hydrated, setHydrated] = useState(false);
-  // Keep the loader up for one full ring revolution so it doesn't just flash
+  const qc = useQueryClient();
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => {
-    const id = window.setTimeout(() => setHydrated(true), LOADER_REVOLUTION_MS);
-    return () => window.clearTimeout(id);
-  }, []);
+    let cancelled = false;
+    const started = Date.now();
+    void initStorage(qc)
+      .then(async () => {
+        const wait = Math.max(0, LOADER_REVOLUTION_MS - (Date.now() - started));
+        if (wait) await new Promise((r) => setTimeout(r, wait));
+        if (!cancelled) setReady(true);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load data");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [qc]);
 
   useAndroidBack();
 
-  if (!hydrated) return <LoadingScreen />;
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="font-display text-2xl">Couldn’t open your data</p>
+        <p className="max-w-sm text-sm text-muted-foreground">{error}</p>
+        <button
+          type="button"
+          className="rounded-full bg-primary px-4 py-2 text-sm text-primary-foreground"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  if (!ready) return <LoadingScreen />;
   return <Shell {...props} />;
 }
 

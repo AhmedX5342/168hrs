@@ -5,6 +5,8 @@ import { formatDuration } from "@/lib/dates";
 import type { Task, TaskProgress } from "@/features/tasks/types";
 import { FocusBadge } from "@/features/tasks/FocusBadge";
 import { useBackHandler } from "@/lib/back-button";
+import { useKeepAwake } from "@/lib/use-keep-awake";
+import { alertTimeUp, cancelTimerEnd, scheduleTimerEnd } from "@/lib/timer-alert";
 
 const EXTRA_MS = 15 * 60_000;
 const AUTOSAVE_MS = 10_000;
@@ -21,12 +23,9 @@ function format(ms: number) {
 
 interface Props {
   task: Task;
-  /** Saved progress to resume from, if any */
   initial?: TaskProgress | undefined;
-  /** Persist progress (called on pause, exit, every 10s while running, and when the app is hidden) */
   onSave: (p: TaskProgress) => void;
   onComplete: () => void;
-  /** Leave the timer; progress has already been saved */
   onExit: () => void;
 }
 
@@ -37,12 +36,15 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
   );
   const [running, setRunning] = useState(true);
   const finished = remaining <= 0;
+  const wasFinished = useRef(false);
 
-  // Refs so save callbacks (interval / page events) always see the latest values
   const live = useRef({ total, remaining });
   live.current = { total, remaining };
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
+
+  // Keep screen on while a session is actively running
+  useKeepAwake(running && !finished);
 
   const persist = () => {
     const { total: t, remaining: r } = live.current;
@@ -52,6 +54,7 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     });
   };
 
+  // Countdown tick
   useEffect(() => {
     if (!running || finished) return;
     const endAt = Date.now() + remaining;
@@ -60,7 +63,29 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, finished]);
 
-  // Autosave while running so an app kill / crash loses at most ~10s
+  // Background notification for when the timer ends
+  useEffect(() => {
+    if (!running || finished) {
+      void cancelTimerEnd();
+      return;
+    }
+    void scheduleTimerEnd(task.title, remaining);
+    return () => {
+      void cancelTimerEnd();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, finished, total]);
+
+  // In-app alert when countdown hits zero while open
+  useEffect(() => {
+    if (finished && !wasFinished.current) {
+      wasFinished.current = true;
+      void cancelTimerEnd();
+      alertTimeUp();
+    }
+    if (!finished) wasFinished.current = false;
+  }, [finished]);
+
   useEffect(() => {
     if (!running || finished) return;
     const id = window.setInterval(persist, AUTOSAVE_MS);
@@ -68,7 +93,6 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [running, finished]);
 
-  // Save when the app is backgrounded / closed (mobile)
   useEffect(() => {
     const onHide = () => {
       if (document.visibilityState === "hidden") persist();
@@ -82,6 +106,9 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cancel notification on unmount
+  useEffect(() => () => void cancelTimerEnd(), []);
+
   const R = 120;
   const C = 2 * Math.PI * R;
   const progress = 1 - remaining / total;
@@ -93,16 +120,16 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
   };
 
   const togglePause = () => {
-    if (running) persist(); // pausing saves immediately
+    if (running) persist();
     setRunning((r) => !r);
   };
 
   const saveAndExit = () => {
     persist();
+    void cancelTimerEnd();
     onExit();
   };
 
-  // Android back button = "Save & exit"
   useBackHandler(() => {
     saveAndExit();
     return true;
@@ -136,7 +163,7 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           {finished ? (
-            <span className="font-display text-4xl text-gradient-primary">Time's up</span>
+            <span className="font-display text-4xl text-gradient-primary">Time&apos;s up</span>
           ) : (
             <>
               <span className="font-display text-6xl tabular-nums">{format(remaining)}</span>

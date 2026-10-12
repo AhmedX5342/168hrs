@@ -1,4 +1,4 @@
-import { Check, Play, RotateCcw } from "lucide-react";
+import { ArrowRight, CalendarPlus, Check, Play, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatClock, formatDate, formatDuration, minToTime } from "@/lib/dates";
@@ -15,9 +15,18 @@ interface Props {
   onToggle: () => void;
   /** Discard saved partial progress */
   onReset: () => void;
+  onMoveToday?: () => void;
+  onMoveTomorrow?: () => void;
 }
 
-export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
+export function BlockCard({
+  block,
+  onStart,
+  onToggle,
+  onReset,
+  onMoveToday,
+  onMoveTomorrow,
+}: Props) {
   const { settings } = useSettings();
   const { task, done, unscheduled } = block;
   const area = settings.lifeAreas.find((a) => a.id === task.lifeAreaId);
@@ -155,6 +164,28 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
             }}
           >
             <RotateCcw />
+          </Button>
+        )}
+        {!done && onMoveToday && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="rounded-full"
+            onClick={onMoveToday}
+            title="Move to today"
+          >
+            <CalendarPlus /> Today
+          </Button>
+        )}
+        {!done && onMoveTomorrow && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="rounded-full"
+            onClick={onMoveTomorrow}
+            title="Move to tomorrow"
+          >
+            <ArrowRight /> Tomorrow
           </Button>
         )}
         <Button
