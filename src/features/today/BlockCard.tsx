@@ -81,7 +81,12 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className={cn("font-sans text-lg font-semibold", done && "line-through")}>
+        <h3
+          className={cn(
+            "font-sans text-lg font-semibold [overflow-wrap:anywhere]",
+            done && "line-through",
+          )}
+        >
           {task.title}
         </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

@@ -50,7 +50,7 @@ export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Prop
   return (
     <div
       className={cn(
-        "group flex items-start gap-3 rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft",
+        "group flex min-w-0 items-start gap-3 rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft",
         completed && "opacity-70",
         status.dueOn && "border-destructive/40",
       )}
@@ -69,7 +69,7 @@ export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Prop
         <div className="flex items-start justify-between gap-2">
           <h3
             className={cn(
-              "truncate font-sans text-base font-semibold",
+              "min-w-0 font-sans text-base font-semibold [overflow-wrap:anywhere]",
               completed && "line-through",
             )}
           >
@@ -143,7 +143,9 @@ export function TaskCard({ task, weekStart, onEdit, onSchedule, onDelete }: Prop
           {task.startTime && <span>· {task.startTime}</span>}
         </div>
         {task.notes && (
-          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{task.notes}</p>
+          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+            {task.notes}
+          </p>
         )}
         {unscheduled && (
           <Button variant="outline" size="sm" className="mt-3 h-8" onClick={onSchedule}>

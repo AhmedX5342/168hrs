@@ -337,7 +337,7 @@ export function WeekView() {
             <div
               key={date}
               className={cn(
-                "flex min-h-40 flex-col rounded-2xl border bg-card p-3",
+                "flex min-h-40 min-w-0 flex-col rounded-2xl border bg-card p-3",
                 date === today && "ring-2 ring-primary",
                 full && "border-destructive/40",
               )}
@@ -383,7 +383,7 @@ export function WeekView() {
                   >
                     <span
                       className={cn(
-                        "h-full min-h-4 w-1 shrink-0 rounded-full",
+                        "min-h-4 w-1 shrink-0 self-stretch rounded-full",
                         b.task.unexpected && UNEXPECTED_BAR,
                       )}
                       style={{
@@ -392,7 +392,9 @@ export function WeekView() {
                           : taskAreaColor(settings.lifeAreas, b.task.lifeAreaId),
                       }}
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium">{b.task.title}</span>
+                    <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
+                      {b.task.title}
+                    </span>
                     {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
                     <span className="text-muted-foreground">{formatDuration(b.task.duration)}</span>
                   </div>
@@ -425,11 +427,16 @@ export function WeekView() {
                   )}
                 >
                   <span
-                    className="h-8 w-1 shrink-0 rounded-full"
+                    className="min-h-8 w-1 shrink-0 self-stretch rounded-full"
                     style={{ backgroundColor: taskAreaColor(settings.lifeAreas, t.lifeAreaId) }}
                   />
                   <div className="min-w-0 flex-1">
-                    <div className={cn("truncate font-semibold", doneOn && "line-through")}>
+                    <div
+                      className={cn(
+                        "font-semibold [overflow-wrap:anywhere]",
+                        doneOn && "line-through",
+                      )}
+                    >
                       {t.title}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

@@ -110,11 +110,11 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-10 bg-background px-6 animate-scale-in">
-      <div className="text-center">
+      <div className="max-w-full text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
           {initial ? "Picking back up" : "Locked in"}
         </p>
-        <h2 className="mt-2 text-4xl sm:text-5xl">{task.title}</h2>
+        <h2 className="mt-2 text-4xl [overflow-wrap:anywhere] sm:text-5xl">{task.title}</h2>
         <div className="mt-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
           <FocusBadge focus={task.focus} /> {formatDuration(total / 60_000)}
         </div>
