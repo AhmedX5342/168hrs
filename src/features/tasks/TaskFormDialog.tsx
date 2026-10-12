@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
-import { DAY_SHORT, dayOfWeek, formatDate, weekDates } from "@/lib/dates";
+import { DAY_SHORT, dayOfWeek, formatDate, formatDuration, weekDates } from "@/lib/dates";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
@@ -35,7 +35,8 @@ const NONE = "__none";
 const schema = z
   .object({
     title: z.string().trim().min(1, "Title is required").max(80),
-    hours: z.coerce.number().min(0.25, "At least 15 minutes").max(24, "Max 24 hours"),
+    hours: z.coerce.number().int("Whole hours only").min(0).max(24, "Max 24 hours"),
+    minutes: z.coerce.number().int("Whole minutes only").min(0).max(59, "Minutes: 0–59"),
     focus: z.enum(["deep", "medium", "light"]),
     lifeAreaId: z.string(),
     repeat: z.enum(["once", "daily", "weekly", "days"]),
@@ -44,6 +45,14 @@ const schema = z
     startTime: z.string(),
     notes: z.string().max(500).optional(),
     unexpected: z.boolean(),
+  })
+  .refine((v) => v.hours * 60 + v.minutes >= 15, {
+    path: ["hours"],
+    message: "At least 15 minutes",
+  })
+  .refine((v) => v.hours * 60 + v.minutes <= 24 * 60, {
+    path: ["hours"],
+    message: "Max 24 hours",
   })
   .refine((v) => v.repeat !== "days" || v.days.length > 0, {
     path: ["days"],
@@ -93,15 +102,16 @@ export function TaskFormDialog({
 
   const form = useForm<FormValues>({ resolver: zodResolver(schema) as never });
   const repeat = form.watch("repeat");
-  const hoursValue = Number(form.watch("hours")) || 0;
-  const durationMin = Math.round(hoursValue * 60);
+  const durationMin =
+    (Number(form.watch("hours")) || 0) * 60 + (Number(form.watch("minutes")) || 0);
   const errors = form.formState.errors;
 
   useEffect(() => {
     if (!open) return;
     form.reset({
       title: task?.title ?? "",
-      hours: task ? task.duration / 60 : 1,
+      hours: task ? Math.floor(task.duration / 60) : 1,
+      minutes: task ? task.duration % 60 : 0,
       focus: task?.focus ?? "medium",
       lifeAreaId: task?.lifeAreaId ?? NONE,
       repeat: task?.repeat ?? "once",
@@ -117,7 +127,7 @@ export function TaskFormDialog({
     const base = {
       weekStart: task?.weekStart ?? weekStart,
       title: v.title,
-      duration: Math.round(v.hours * 60),
+      duration: v.hours * 60 + v.minutes,
       focus: v.focus,
       lifeAreaId: v.lifeAreaId === NONE ? undefined : v.lifeAreaId,
       notes: v.notes ?? "",
@@ -134,7 +144,7 @@ export function TaskFormDialog({
     if (full) {
       toast.error(
         "That day is full",
-        `${formatDate(full, { weekday: "long", day: "numeric", month: "short" })} can't fit another ${v.hours}h — it would exceed 24h.`,
+        `${formatDate(full, { weekday: "long", day: "numeric", month: "short" })} can't fit another ${formatDuration(base.duration)} — it would exceed 24h.`,
       );
       return;
     }
@@ -162,8 +172,29 @@ export function TaskFormDialog({
             <Input placeholder="Study session" {...form.register("title")} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Time required (hours)" error={errors.hours?.message}>
-              <Input type="number" step="0.25" min="0.25" {...form.register("hours")} />
+            <Field label="Time required" error={errors.hours?.message ?? errors.minutes?.message}>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min="0"
+                  max="24"
+                  step="1"
+                  inputMode="numeric"
+                  aria-label="Hours"
+                  {...form.register("hours")}
+                />
+                <span className="text-sm text-muted-foreground">h</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="1"
+                  inputMode="numeric"
+                  aria-label="Minutes"
+                  {...form.register("minutes")}
+                />
+                <span className="text-sm text-muted-foreground">m</span>
+              </div>
             </Field>
             <Field label="Focus level">
               <Controller
