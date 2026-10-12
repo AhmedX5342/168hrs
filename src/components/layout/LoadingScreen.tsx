@@ -1,3 +1,6 @@
+/** Time for the main arc to complete one full revolution; also the minimum time the loader shows. */
+export const LOADER_REVOLUTION_MS = 1000;
+
 /**
  * Startup loader. Uses theme tokens only, so it follows light/dark automatically
  * (main.tsx applies the saved theme before the first render).
@@ -24,7 +27,8 @@ export function LoadingScreen() {
             cx="80"
             cy="80"
             r={R}
-            className="origin-center animate-spin fill-none stroke-primary [animation-duration:1.4s]"
+            className="origin-center animate-spin fill-none stroke-primary"
+            style={{ animationDuration: `${LOADER_REVOLUTION_MS}ms` }}
             strokeWidth="5"
             strokeLinecap="round"
             strokeDasharray={`${C * 0.28} ${C}`}
@@ -34,7 +38,7 @@ export function LoadingScreen() {
             cx="80"
             cy="80"
             r={R - 9}
-            className="origin-center fill-none stroke-primary/30 animate-spin [animation-direction:reverse] [animation-duration:2.4s]"
+            className="origin-center fill-none stroke-primary/30 animate-spin [animation-direction:reverse] [animation-duration:1s]"
             strokeWidth="2"
             strokeLinecap="round"
             strokeDasharray={`${C * 0.12} ${C}`}

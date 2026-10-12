@@ -6,7 +6,7 @@ import { Onboarding } from "@/features/onboarding/Onboarding";
 import { useAndroidBack } from "@/hooks/use-android-back";
 import { Sidebar } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
-import { LoadingScreen } from "./LoadingScreen";
+import { LOADER_REVOLUTION_MS, LoadingScreen } from "./LoadingScreen";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -37,8 +37,10 @@ function Shell({ children, className }: AppLayoutProps) {
 /** Data lives in localStorage, so the shell renders only after hydration. */
 function AppLayoutComponent(props: AppLayoutProps) {
   const [hydrated, setHydrated] = useState(false);
+  // Keep the loader up for one full ring revolution so it doesn't just flash
   useEffect(() => {
-    setHydrated(true);
+    const id = window.setTimeout(() => setHydrated(true), LOADER_REVOLUTION_MS);
+    return () => window.clearTimeout(id);
   }, []);
 
   useAndroidBack();
