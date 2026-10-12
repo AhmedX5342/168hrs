@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 import { clearAll, exportAll, importAll } from "@/lib/storage";
+import { saveJsonFile } from "@/lib/export-file";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { WEEKDAY_OPTIONS, type WeekStartDay } from "@/features/settings/types";
@@ -31,13 +32,15 @@ export function SettingsPage() {
   const [areaIcon, setAreaIcon] = useState("sparkles");
   const [areaColor, setAreaColor] = useState(() => nextAreaColor(settings.lifeAreas));
 
-  const doExport = () => {
-    const blob = new Blob([JSON.stringify(exportAll(), null, 2)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "168hrs-backup.json";
-    a.click();
-    toast.success("Data exported");
+  const doExport = async () => {
+    try {
+      await saveJsonFile("168hrs-backup.json", exportAll());
+      toast.success("Data exported");
+    } catch (e) {
+      // Dismissing the share sheet counts as cancelling, not failing
+      if (e instanceof Error && /cancel/i.test(e.message)) return;
+      toast.error("Export failed", e instanceof Error ? e.message : undefined);
+    }
   };
   const doImport = async (file: File) => {
     try {
@@ -289,7 +292,7 @@ export function SettingsPage() {
           <input
             ref={fileRef}
             type="file"
-            accept="application/json"
+            accept="application/json,.json"
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
