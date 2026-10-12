@@ -164,20 +164,38 @@ export async function exportAll(): Promise<Backup> {
     if (row) images[id] = await blobToDataUrl(row.blob);
   }
 
+  // Always emit every collection so backups are complete and re-importable
   return {
     version: 2,
-    settings: get("settings"),
+    settings: structuredClone(get("settings") ?? {}),
     tasks: tasks.sort(byCreated),
-    weeks: get("weeks"),
-    sleepLogs: get("sleepLogs"),
+    weeks: structuredClone(get("weeks") ?? []),
+    sleepLogs: structuredClone(get("sleepLogs") ?? []),
     notes: notes.sort(byCreated),
     images,
   };
 }
 
-/** Accepts v2 backups and old (v1) backups. Collections present in the file replace existing ones. */
-export async function importAll(input: Record<string, unknown>) {
-  const data = (input.version === 2 ? input : convertLegacyBackup(input)) as unknown as Backup;
+/** Clone plain JSON so Dexie never holds live React/query object graphs. */
+function cloneJson<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
+}
+
+/**
+ * Accepts v2 backups and old (v1) backups (no version, images inside notes).
+ * Every collection present in the file replaces the matching store.
+ * Always returns the normalized payload that was written (for cache hydration).
+ */
+export async function importAll(input: Record<string, unknown>): Promise<Backup> {
+  // Support files that wrap payload under { data: {...} } or { backup: {...} }
+  const root =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? ((input.data as Record<string, unknown> | undefined) ??
+        (input.backup as Record<string, unknown> | undefined) ??
+        input)
+      : (input as Record<string, unknown>);
+
+  const data = (root.version === 2 ? root : convertLegacyBackup(root)) as unknown as Backup;
 
   const valid = (rows: unknown): IdRow[] | null =>
     Array.isArray(rows)
@@ -185,29 +203,79 @@ export async function importAll(input: Record<string, unknown>) {
       : null;
   const tasks = valid(data.tasks);
   const notes = valid(data.notes);
-  const imageRows: ImageRow[] = Object.entries(data.images ?? {}).map(([id, url]) => ({
-    id,
-    blob: dataUrlToBlob(url),
-    createdAt: Date.now(),
-  }));
+
+  // Settings: accept object only; deep-clone so nested lifeAreas are preserved
+  const settings =
+    data.settings != null && typeof data.settings === "object" && !Array.isArray(data.settings)
+      ? cloneJson(data.settings)
+      : null;
+
+  const weeks = Array.isArray(data.weeks)
+    ? cloneJson(data.weeks)
+    : data.weeks != null
+      ? data.weeks
+      : null;
+  const sleepLogs = Array.isArray(data.sleepLogs)
+    ? cloneJson(data.sleepLogs)
+    : data.sleepLogs != null
+      ? data.sleepLogs
+      : null;
+
+  const imageRows: ImageRow[] = Object.entries(data.images ?? {}).flatMap(([id, url]) => {
+    try {
+      if (typeof url !== "string") return [];
+      return [{ id, blob: dataUrlToBlob(url), createdAt: Date.now() }];
+    } catch {
+      return [];
+    }
+  });
 
   await db.transaction("rw", db.kv, db.tasks, db.notes, db.images, async () => {
-    if (data.settings != null) await db.kv.put({ key: "settings", value: data.settings });
-    if (data.weeks != null) await db.kv.put({ key: "weeks", value: data.weeks });
-    if (data.sleepLogs != null) await db.kv.put({ key: "sleepLogs", value: data.sleepLogs });
+    if (settings) await db.kv.put({ key: "settings", value: settings });
+    if (weeks != null) await db.kv.put({ key: "weeks", value: weeks });
+    if (sleepLogs != null) await db.kv.put({ key: "sleepLogs", value: sleepLogs });
     if (tasks) {
       await db.tasks.clear();
-      await db.tasks.bulkPut(tasks);
+      if (tasks.length) await db.tasks.bulkPut(cloneJson(tasks));
     }
     if (notes) {
       await db.notes.clear();
       await db.images.clear();
-      await db.notes.bulkPut(notes);
-      await db.images.bulkPut(imageRows);
+      if (notes.length) await db.notes.bulkPut(cloneJson(notes));
+      if (imageRows.length) await db.images.bulkPut(imageRows);
     }
   });
 
-  saveTheme((data.settings as { theme?: unknown } | null | undefined)?.theme);
+  if (settings) saveTheme((settings as { theme?: unknown }).theme);
+
+  return {
+    version: 2,
+    settings: settings ?? undefined,
+    tasks: tasks ?? undefined,
+    weeks: weeks ?? undefined,
+    sleepLogs: sleepLogs ?? undefined,
+    notes: notes ?? undefined,
+    images: data.images,
+  };
+}
+
+/** Push imported values into React Query so the UI updates without a full reload. */
+export async function hydrateStoreCache(qc: QueryClient, imported?: Backup) {
+  if (imported?.settings != null)
+    qc.setQueryData(["store", STORAGE_KEYS.settings], imported.settings);
+  if (imported?.tasks) qc.setQueryData(["store", STORAGE_KEYS.tasks], imported.tasks);
+  if (imported?.weeks != null) qc.setQueryData(["store", STORAGE_KEYS.weeks], imported.weeks);
+  if (imported?.sleepLogs != null)
+    qc.setQueryData(["store", STORAGE_KEYS.sleepLogs], imported.sleepLogs);
+  if (imported?.notes) qc.setQueryData(["store", STORAGE_KEYS.notes], imported.notes);
+
+  // Also re-read from Dexie so cache matches disk even if a field was omitted above
+  await Promise.all(
+    Object.values(STORAGE_KEYS).map(async (k) => {
+      const value = await loadKey(k, EMPTY[k]);
+      qc.setQueryData(["store", k], value);
+    }),
+  );
 }
 
 export async function clearAll() {

@@ -17,7 +17,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
-import { importAll } from "@/lib/storage";
+import { hydrateStoreCache, importAll } from "@/lib/storage";
 import { useBackHandler } from "@/lib/back-button";
 import { useSettings } from "@/features/settings/use-settings";
 import {
@@ -117,11 +117,15 @@ export function Onboarding() {
   const doImport = async (file: File) => {
     try {
       const data = JSON.parse(await file.text()) as Record<string, unknown> | null;
-      if (!data || typeof data !== "object" || !data.settings) throw new Error("Invalid backup");
-      importAll(data);
-      await qc.invalidateQueries();
-      toast.success("Settings imported");
-    } catch {
+      if (!data || typeof data !== "object") throw new Error("Invalid backup");
+      // Require at least settings or tasks so we don't accept empty files
+      if (!data.settings && !data.tasks) throw new Error("Invalid backup");
+      const imported = await importAll(data);
+      await hydrateStoreCache(qc, imported);
+      toast.success("Backup imported");
+      window.setTimeout(() => window.location.reload(), 400);
+    } catch (e) {
+      console.error(e);
       toast.error("That file couldn't be read");
     }
   };

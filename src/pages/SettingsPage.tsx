@@ -15,7 +15,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
-import { clearAll, exportAll, importAll } from "@/lib/storage";
+import { clearAll, exportAll, hydrateStoreCache, importAll } from "@/lib/storage";
 import { saveJsonFile } from "@/lib/export-file";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
@@ -44,11 +44,15 @@ export function SettingsPage() {
   };
   const doImport = async (file: File) => {
     try {
-      await importAll(JSON.parse(await file.text()));
-      await qc.invalidateQueries();
+      const raw = JSON.parse(await file.text()) as Record<string, unknown>;
+      const imported = await importAll(raw);
+      await hydrateStoreCache(qc, imported);
       toast.success("Data imported");
-    } catch {
-      toast.error("That file couldn't be read");
+      // Remount so defaultValue fields (name, sleep times, etc.) pick up new settings
+      window.setTimeout(() => window.location.reload(), 400);
+    } catch (e) {
+      console.error(e);
+      toast.error("That file couldn't be read", e instanceof Error ? e.message : undefined);
     }
   };
 
