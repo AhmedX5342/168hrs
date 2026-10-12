@@ -3,8 +3,10 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/features/settings/use-settings";
 import { useEnsureWeeks } from "@/features/weeks/use-weeks";
 import { Onboarding } from "@/features/onboarding/Onboarding";
+import { useAndroidBack } from "@/hooks/use-android-back";
 import { Sidebar } from "./Sidebar";
 import { BottomNav } from "./BottomNav";
+import { LoadingScreen } from "./LoadingScreen";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -39,13 +41,9 @@ function AppLayoutComponent(props: AppLayoutProps) {
     setHydrated(true);
   }, []);
 
-  if (!hydrated) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <span className="font-display text-6xl text-gradient-primary animate-pulse">168</span>
-      </div>
-    );
-  }
+  useAndroidBack();
+
+  if (!hydrated) return <LoadingScreen />;
   return <Shell {...props} />;
 }
 

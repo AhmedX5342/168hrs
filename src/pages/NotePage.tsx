@@ -27,7 +27,7 @@ const MAX_IMAGES = 10;
 export function NotePage() {
   const { noteId } = useParams<{ noteId: string }>();
   const { settings } = useSettings();
-  const { getById, updateNote, deleteNote, togglePin } = useNotes();
+  const { getById, updateNote, deleteNote } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -91,6 +91,25 @@ export function NotePage() {
     }
   };
 
+  /**
+   * Pinning also saves the current edits. Toggling the pin alone bumps updatedAt, which
+   * re-syncs the form from storage and would wipe anything unsaved.
+   */
+  const pin = async () => {
+    try {
+      await updateNote(note.id, {
+        title: title.trim(),
+        body,
+        images,
+        lifeAreaId: lifeAreaId === NONE ? undefined : lifeAreaId,
+        pinned: !note.pinned,
+      });
+      toast.success(note.pinned ? "Unpinned" : "Saved and pinned");
+    } catch {
+      toast.error("Couldn't save", "Browser storage may be full — try a smaller image.");
+    }
+  };
+
   return (
     <article className="mx-auto max-w-2xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
@@ -103,7 +122,7 @@ export function NotePage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void togglePin(note.id)}
+            onClick={() => void pin()}
             aria-label={note.pinned ? "Unpin" : "Pin"}
           >
             {note.pinned ? <PinOff /> : <Pin />}
@@ -153,7 +172,9 @@ export function NotePage() {
               {settings.lifeAreas.map((a) => (
                 <SelectItem key={a.id} value={a.id}>
                   <span className="flex items-center gap-2">
-                    <LifeAreaIcon icon={a.icon} className="size-4" />
+                    <span style={{ color: a.color }}>
+                      <LifeAreaIcon icon={a.icon} className="size-4" />
+                    </span>
                     {a.name}
                   </span>
                 </SelectItem>

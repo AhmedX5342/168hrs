@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { formatDuration } from "@/lib/dates";
 import type { Task, TaskProgress } from "@/features/tasks/types";
 import { FocusBadge } from "@/features/tasks/FocusBadge";
+import { useBackHandler } from "@/lib/back-button";
 
 const EXTRA_MS = 15 * 60_000;
 const AUTOSAVE_MS = 10_000;
@@ -100,6 +101,12 @@ export function FocusTimer({ task, initial, onSave, onComplete, onExit }: Props)
     persist();
     onExit();
   };
+
+  // Android back button = "Save & exit"
+  useBackHandler(() => {
+    saveAndExit();
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-10 bg-background px-6 animate-scale-in">

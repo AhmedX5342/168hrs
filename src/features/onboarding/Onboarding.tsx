@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, ArrowRight, Moon, Plus, Sun, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Moon, Plus, Sun, Trash2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
+import { importAll } from "@/lib/storage";
+import { useBackHandler } from "@/lib/back-button";
 import { useSettings } from "@/features/settings/use-settings";
 import {
   DEFAULT_SETTINGS,
@@ -65,6 +68,17 @@ export function Onboarding() {
   /** 0 = intro, 1 = name, 2 = life areas, 3 = preferences */
   const [step, setStep] = useState(0);
   const { settings, patch } = useSettings();
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Android back button = "Previous" (from the intro it falls through and exits the app)
+  useBackHandler(() => {
+    if (step > 0) {
+      setStep(step - 1);
+      return true;
+    }
+    return false;
+  });
 
   // Draft values — committed on finish (theme is applied immediately instead)
   const [lifeAreas, setLifeAreas] = useState<LifeArea[]>(DEFAULT_SETTINGS.lifeAreas);
@@ -97,6 +111,19 @@ export function Onboarding() {
     setAreaName("");
     setAreaIcon("sparkles");
     setAdding(false);
+  };
+
+  /** Restore a backup exported from Settings → Data. Skips onboarding if it was completed there. */
+  const doImport = async (file: File) => {
+    try {
+      const data = JSON.parse(await file.text()) as Record<string, unknown> | null;
+      if (!data || typeof data !== "object" || !data.settings) throw new Error("Invalid backup");
+      importAll(data);
+      await qc.invalidateQueries();
+      toast.success("Settings imported");
+    } catch {
+      toast.error("That file couldn't be read");
+    }
   };
 
   const finish = async () => {
@@ -137,9 +164,30 @@ export function Onboarding() {
               </div>
             ))}
           </div>
-          <Button size="lg" className="mt-10 rounded-full px-8" onClick={() => setStep(1)}>
-            Take them back <ArrowRight />
-          </Button>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
+            <Button size="lg" className="rounded-full px-8" onClick={() => setStep(1)}>
+              Take them back <ArrowRight />
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="rounded-full px-6"
+              onClick={() => fileRef.current?.click()}
+            >
+              <Upload /> Import settings
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void doImport(f);
+                e.target.value = "";
+              }}
+            />
+          </div>
         </div>
       </div>
     );

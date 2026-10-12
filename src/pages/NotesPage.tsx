@@ -22,6 +22,8 @@ import { formatDate, todayISO } from "@/lib/dates";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
 import { LifeAreaIcon } from "@/features/life-areas/icons";
+import { tint } from "@/features/life-areas/colors";
+import { cn } from "@/lib/utils";
 import { useNotes } from "@/features/notes/use-notes";
 import { NoteBody } from "@/features/notes/NoteBody";
 import type { Note } from "@/features/notes/note-types";
@@ -39,18 +41,27 @@ function AreaCard({
   icon,
   title,
   count,
+  color,
 }: {
   to: string;
   icon: ReactNode;
   title: string;
   count: number;
+  /** Life-area color; omit for neutral cards */
+  color?: string;
 }) {
   return (
     <Link
       to={to}
       className="group flex items-center gap-4 rounded-2xl border bg-card p-5 transition-shadow hover:shadow-soft"
     >
-      <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+      <div
+        className={cn(
+          "flex size-12 shrink-0 items-center justify-center rounded-xl",
+          !color && "bg-accent text-accent-foreground",
+        )}
+        style={color ? { backgroundColor: tint(color), color } : undefined}
+      >
         {icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -65,13 +76,16 @@ function AreaCard({
 function NoteRow({
   note,
   area,
+  showArea,
   backTo,
   onTogglePin,
   onDelete,
 }: {
   note: Note;
-  /** Pass to show the life-area chip (omitted inside a single-area view) */
+  /** The note's life area (used for its color) */
   area?: LifeArea | undefined;
+  /** Show the life-area chip (hidden inside a single-area view) */
+  showArea: boolean;
   backTo: string;
   onTogglePin: () => void;
   onDelete: () => void;
@@ -83,7 +97,10 @@ function NoteRow({
       .find((l) => l.trim()) ?? "";
 
   return (
-    <div className="flex items-start gap-2 rounded-2xl border bg-card p-4 transition-shadow hover:shadow-soft">
+    <div className="relative flex items-start gap-2 overflow-hidden rounded-2xl border bg-card p-4 pl-5 transition-shadow hover:shadow-soft">
+      {area && (
+        <span className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: area.color }} />
+      )}
       <Link
         to={`/notes/${note.id}`}
         state={{ back: backTo }}
@@ -96,8 +113,11 @@ function NoteRow({
                 Pinned
               </span>
             )}
-            {area && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {area && showArea && (
+              <span
+                className="flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                style={{ backgroundColor: tint(area.color), color: area.color }}
+              >
                 <LifeAreaIcon icon={area.icon} className="size-3.5" />
                 {area.name}
               </span>
@@ -225,7 +245,8 @@ export function NotesPage() {
     <NoteRow
       key={n.id}
       note={n}
-      area={view === "area" ? undefined : lifeAreas.find((a) => a.id === n.lifeAreaId)}
+      area={lifeAreas.find((a) => a.id === n.lifeAreaId)}
+      showArea={view !== "area"}
       backTo={backTo}
       onTogglePin={() => void togglePin(n.id)}
       onDelete={() => confirmDelete(n)}
@@ -274,6 +295,7 @@ export function NotesPage() {
               icon={<LifeAreaIcon icon={a.icon} className="size-5" />}
               title={a.name}
               count={counts.byArea.get(a.id) ?? 0}
+              color={a.color}
             />
           ))}
           {counts.unassigned > 0 && (
@@ -344,7 +366,9 @@ export function NotesPage() {
                 {lifeAreas.map((a) => (
                   <SelectItem key={a.id} value={a.id}>
                     <span className="flex items-center gap-2">
-                      <LifeAreaIcon icon={a.icon} className="size-4" />
+                      <span style={{ color: a.color }}>
+                        <LifeAreaIcon icon={a.icon} className="size-4" />
+                      </span>
                       {a.name}
                     </span>
                   </SelectItem>
