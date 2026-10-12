@@ -164,7 +164,32 @@ export function blocksForDate(
         }))
     : [];
 
-  return [...scheduled, ...weekly, ...unscheduled, ...overdue].sort((a, b) => a.start - b.start);
+  const combined = [...scheduled, ...weekly, ...unscheduled, ...overdue];
+
+  // Attach per-day work seconds; add a work-log-only block when this day has effort
+  // but the task is not already listed (e.g. worked Sunday on a task dated Monday).
+  const seen = new Set(combined.map((b) => b.task.id));
+  for (const b of combined) {
+    const sec = b.task.workLog?.[date] ?? 0;
+    if (sec > 0) b.dayWorkSec = sec;
+  }
+  let logI = 0;
+  for (const t of tasks) {
+    const sec = t.workLog?.[date] ?? 0;
+    if (sec <= 0 || seen.has(t.id)) continue;
+    combined.push({
+      task: t,
+      date,
+      start: 26 * 60 + logI,
+      end: 26 * 60 + logI + t.duration,
+      done: t.repeat === "once" ? t.completions.length > 0 : t.completions.includes(date),
+      dayWorkSec: sec,
+      workLogOnly: true,
+    });
+    logI++;
+  }
+
+  return combined.sort((a, b) => a.start - b.start);
 }
 
 /** Tasks visible in a given week's library */

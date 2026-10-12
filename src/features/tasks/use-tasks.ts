@@ -73,13 +73,27 @@ export function useTasks() {
         prev.map((t) => {
           if (t.id !== id) return t;
           const progress = { ...(t.progress ?? {}) };
+          const workLog = { ...(t.workLog ?? {}) };
+          const prevElapsed = progress[key]?.elapsed ?? 0;
           if (p && p.elapsed > 0) {
+            const delta = Math.max(0, p.elapsed - prevElapsed);
+            if (delta > 0) {
+              const day = todayISO();
+              workLog[day] = (workLog[day] ?? 0) + delta;
+            }
             progress[key] = {
               ...p,
               startedAt: progress[key]?.startedAt ?? p.startedAt ?? todayISO(),
             };
-          } else delete progress[key];
-          return { ...t, progress };
+          } else {
+            // Clear active session only — keep workLog history
+            delete progress[key];
+          }
+          return {
+            ...t,
+            progress: Object.keys(progress).length ? progress : undefined,
+            workLog: Object.keys(workLog).length ? workLog : undefined,
+          };
         }),
       ),
     [mutate],

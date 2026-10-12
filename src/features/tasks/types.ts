@@ -34,8 +34,13 @@ export interface Task {
   startTime: string | null;
   /** ISO dates on which the task was completed */
   completions: string[];
-  /** Partially completed focus sessions, keyed by ISO date */
+  /** Partially completed focus sessions, keyed by occurrence (floating / date / week:…) */
   progress?: Record<string, TaskProgress>;
+  /**
+   * Seconds of focused work attributed to each calendar day (ISO date → seconds).
+   * Survives completion so multi-day effort stays visible on each day it happened.
+   */
+  workLog?: Record<string, number>;
   createdAt: number;
   /** Sudden / ad-hoc work outside the plan */
   unexpected?: boolean;
@@ -54,6 +59,10 @@ export interface Block {
   weekly?: boolean;
   /** Week this block belongs to (weekly blocks only) */
   weekStart?: string;
+  /** Seconds worked on this calendar day (from workLog) */
+  dayWorkSec?: number;
+  /** Shown only because work was logged this day (not the task's scheduled slot) */
+  workLogOnly?: boolean;
 }
 
 /** Progress key for a weekly task, one entry per week */

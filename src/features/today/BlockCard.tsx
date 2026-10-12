@@ -24,14 +24,18 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
   const areaColor = taskAreaColor(settings.lifeAreas, task.lifeAreaId);
   const timed = !unscheduled && task.startTime;
 
-  // Partial progress for this occurrence
+  // Session progress (resume) + work done on this calendar day
   const prog = task.progress?.[progressKey(block)];
   const totalSec = Math.max(prog?.total ?? 0, task.duration * 60);
-  const elapsedSec = !done && prog ? Math.min(prog.elapsed, totalSec) : 0;
-  const partial = elapsedSec > 0;
-  const pct = Math.round((elapsedSec / totalSec) * 100);
-  const finishedSession = partial && elapsedSec >= totalSec;
+  const sessionElapsed = !done && prog ? Math.min(prog.elapsed, totalSec) : 0;
+  const dayWorkSec = block.dayWorkSec ?? 0;
+  const dayWorkMin = Math.round(dayWorkSec / 60);
+  const dayPct = Math.min(100, Math.round((dayWorkSec / Math.max(1, task.duration * 60)) * 100));
+  const partial = sessionElapsed > 0;
+  const pct = Math.round((sessionElapsed / totalSec) * 100);
+  const finishedSession = partial && sessionElapsed >= totalSec;
   const mins = (sec: number) => Math.round(sec / 60);
+  const workLogOnly = !!block.workLogOnly;
 
   return (
     <div
@@ -48,7 +52,15 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
         style={{ backgroundColor: task.unexpected ? undefined : areaColor }}
       />
       <div className="w-28 shrink-0">
-        {block.overdue && task.date ? (
+        {workLogOnly ? (
+          <>
+            <div className="text-xs font-semibold uppercase tracking-wider text-primary">
+              Worked
+            </div>
+            <div className="font-display text-xl">{formatDuration(dayWorkMin)}</div>
+            <div className="text-xs text-muted-foreground">of {formatDuration(task.duration)}</div>
+          </>
+        ) : block.overdue && task.date ? (
           <>
             <div className="text-xs font-semibold uppercase tracking-wider text-destructive">
               Overdue
@@ -105,6 +117,11 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
               In progress · {pct}%
             </span>
           )}
+          {dayWorkSec > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary">
+              {formatDuration(dayWorkMin)} today · {dayPct}%
+            </span>
+          )}
           {task.unexpected && (
             <span className="rounded-full bg-destructive/15 px-2 py-0.5 font-semibold text-destructive">
               Unexpected
@@ -131,8 +148,22 @@ export function BlockCard({ block, onStart, onToggle, onReset }: Props) {
               />
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              {formatDuration(mins(elapsedSec))} done ·{" "}
-              {formatDuration(mins(totalSec - elapsedSec))} left
+              {formatDuration(mins(sessionElapsed))} done ·{" "}
+              {formatDuration(mins(totalSec - sessionElapsed))} left
+            </p>
+          </div>
+        )}
+        {!partial && dayWorkSec > 0 && (
+          <div className="mt-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                style={{ width: `${dayPct}%` }}
+              />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatDuration(dayWorkMin)} logged this day
+              {done ? "" : ` · ${formatDuration(task.duration)} total`}
             </p>
           </div>
         )}

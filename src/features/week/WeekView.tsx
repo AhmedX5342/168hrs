@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { addDays, formatDate, formatDuration, fromISO, todayISO, weekDates } from "@/lib/dates";
+import {
+  addDays,
+  formatDate,
+  formatDuration,
+  fromISO,
+  todayISO,
+  weekDates,
+  formatClock,
+} from "@/lib/dates";
 import { useSettings } from "@/features/settings/use-settings";
 import { useWeeks } from "@/features/weeks/use-weeks";
 import { useTasks } from "@/features/tasks/use-tasks";
@@ -331,7 +339,12 @@ export function WeekView() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-7">
         {days.map(({ date, blocks }) => {
           // Weekly tasks aren't tied to a day, so they don't count toward the day's 24h
-          const total = blocks.filter((b) => !b.weekly).reduce((s, b) => s + b.task.duration, 0);
+          const total = blocks
+            .filter((b) => !b.weekly)
+            .reduce((s, b) => {
+              if (b.workLogOnly && b.dayWorkSec) return s + Math.round(b.dayWorkSec / 60);
+              return s + b.task.duration;
+            }, 0);
           const full = total >= DAY_MIN;
           return (
             <div
@@ -372,33 +385,68 @@ export function WeekView() {
                 </div>
               </div>
               <div className="flex flex-1 flex-col gap-1.5">
-                {blocks.map((b) => (
-                  <div
-                    key={b.task.id}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg bg-secondary px-2 py-1.5 text-xs",
-                      b.done && "opacity-50 line-through",
-                      b.task.unexpected && "ring-1 ring-destructive/40",
-                    )}
-                  >
-                    <span
+                {blocks.map((b) => {
+                  const daySec = b.dayWorkSec ?? 0;
+                  const dayMin = Math.round(daySec / 60);
+                  const dayPct =
+                    daySec > 0
+                      ? Math.min(
+                          100,
+                          Math.round((daySec / Math.max(1, b.task.duration * 60)) * 100),
+                        )
+                      : 0;
+                  return (
+                    <div
+                      key={`${b.task.id}-${b.workLogOnly ? "log" : "slot"}`}
                       className={cn(
-                        "min-h-4 w-1 shrink-0 self-stretch rounded-full",
-                        b.task.unexpected && UNEXPECTED_BAR,
+                        "flex flex-col gap-1 rounded-lg bg-secondary px-2 py-1.5 text-xs",
+                        b.done && !daySec && "opacity-50 line-through",
+                        b.task.unexpected && "ring-1 ring-destructive/40",
+                        b.workLogOnly && "border border-dashed border-primary/30",
                       )}
-                      style={{
-                        backgroundColor: b.task.unexpected
-                          ? undefined
-                          : taskAreaColor(settings.lifeAreas, b.task.lifeAreaId),
-                      }}
-                    />
-                    <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
-                      {b.task.title}
-                    </span>
-                    {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
-                    <span className="text-muted-foreground">{formatDuration(b.task.duration)}</span>
-                  </div>
-                ))}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "min-h-4 w-1 shrink-0 self-stretch rounded-full",
+                            b.task.unexpected && UNEXPECTED_BAR,
+                          )}
+                          style={{
+                            backgroundColor: b.task.unexpected
+                              ? undefined
+                              : taskAreaColor(settings.lifeAreas, b.task.lifeAreaId),
+                          }}
+                        />
+                        <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
+                          {b.task.title}
+                        </span>
+                        {b.task.startTime && !b.weekly && !b.workLogOnly && (
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            {formatClock(b.task.startTime, settings.clockFormat)}
+                          </span>
+                        )}
+                        {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
+                        {daySec > 0 ? (
+                          <span className="shrink-0 font-semibold tabular-nums text-primary">
+                            {dayPct}% · {formatDuration(dayMin)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {formatDuration(b.task.duration)}
+                          </span>
+                        )}
+                      </div>
+                      {daySec > 0 && (
+                        <div className="ml-3 h-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary/80"
+                            style={{ width: `${dayPct}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {!blocks.length && (
                   <span className="m-auto text-xs text-muted-foreground">Free day</span>
                 )}
