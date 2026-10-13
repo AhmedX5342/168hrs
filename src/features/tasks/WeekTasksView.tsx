@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Plus } from "lucide-react";
+import { ArrowLeft, ChevronDown, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -13,7 +13,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { addDays, formatDate } from "@/lib/dates";
+import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { useWeeks } from "@/features/weeks/use-weeks";
 import { useTasks } from "./use-tasks";
@@ -39,23 +41,41 @@ function Section({
   empty: string;
   actions: (t: Task) => React.ComponentProps<typeof TaskCard>;
 }) {
+  const [open, setOpen] = useState(true);
+
   return (
-    <section>
-      <h2 className="mb-3 flex items-baseline gap-2 text-2xl">
-        {title} <span className="font-sans text-sm text-muted-foreground">{tasks.length}</span>
-      </h2>
-      {tasks.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {tasks.map((t) => (
-            <TaskCard key={t.id} {...actions(t)} />
-          ))}
-        </div>
-      ) : (
-        <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          {empty}
-        </p>
-      )}
-    </section>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="mb-3 flex w-full items-center gap-2 text-left text-2xl font-display"
+        >
+          <ChevronDown
+            className={cn(
+              "size-5 shrink-0 text-muted-foreground transition-transform",
+              open && "rotate-180",
+            )}
+          />
+          <span>{title}</span>
+          <span className="font-sans text-sm text-muted-foreground">{tasks.length}</span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3">
+        {tasks.length ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {tasks.map((t, i) => (
+              <div key={t.id} className="animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
+                <TaskCard {...actions(t)} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {empty}
+          </p>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

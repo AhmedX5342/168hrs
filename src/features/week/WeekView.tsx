@@ -230,7 +230,7 @@ export function WeekView() {
             168
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            hours this week · {fmt(capacityMin)} awake · {fmt(remainingMin)} work left
+            hours this week · {fmt(capacityMin)} awake
           </p>
         </div>
         <div className="space-y-5">
