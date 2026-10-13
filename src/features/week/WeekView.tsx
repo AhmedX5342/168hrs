@@ -78,7 +78,13 @@ export function WeekView() {
   const days = weekDays.map((d) => ({
     date: d,
     // includeWeekly: completed weekly tasks appear on the day they were completed
-    blocks: blocksForDate(tasks, d, { showUnscheduled: false, weekStart, includeWeekly: true }),
+    blocks: blocksForDate(tasks, d, {
+      showUnscheduled: false,
+      weekStart,
+      includeWeekly: true,
+      // Completed once-tasks show on the day they were finished; workLog still shows on every day worked
+      showCompletionOnFinishDay: true,
+    }),
   }));
   const plannedMin = plannedWeekMin(tasks, weekStart, weekDays);
   const sleepMin = Math.round(weeklySleepHours * 60);
@@ -400,7 +406,7 @@ export function WeekView() {
                       key={`${b.task.id}-${b.workLogOnly ? "log" : "slot"}`}
                       className={cn(
                         "flex flex-col gap-1 rounded-lg bg-secondary px-2 py-1.5 text-xs",
-                        b.done && !daySec && "opacity-50 line-through",
+                        b.done && "opacity-50 line-through",
                         b.task.unexpected && "ring-1 ring-destructive/40",
                         b.workLogOnly && "border border-dashed border-primary/30",
                       )}
@@ -426,7 +432,12 @@ export function WeekView() {
                           </span>
                         )}
                         {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
-                        {daySec > 0 ? (
+                        {b.done ? (
+                          <span className="shrink-0 text-muted-foreground">
+                            Done
+                            {daySec > 0 ? ` · ${formatDuration(dayMin)}` : ""}
+                          </span>
+                        ) : daySec > 0 ? (
                           <span className="shrink-0 font-semibold tabular-nums text-primary">
                             {dayPct}% · {formatDuration(dayMin)}
                           </span>

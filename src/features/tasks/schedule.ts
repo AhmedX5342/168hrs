@@ -60,6 +60,17 @@ export function firstFullDay(
   return null;
 }
 
+/** Seconds worked on a calendar day (workLog preferred; falls back to active session started that day). */
+function dayWorkSeconds(t: Task, date: string): number {
+  const logged = t.workLog?.[date] ?? 0;
+  if (logged > 0) return logged;
+  // Legacy / in-progress session started this day
+  for (const p of Object.values(t.progress ?? {})) {
+    if (p.startedAt === date && p.elapsed > 0) return p.elapsed;
+  }
+  return 0;
+}
+
 /** Scheduled blocks, plus optional unscheduled / overdue / weekly blocks, for a day. */
 export function blocksForDate(
   tasks: Task[],
@@ -72,23 +83,34 @@ export function blocksForDate(
     includeWeekly?: boolean;
     /** Uncompleted weekly tasks, shown on this day (use for "today") */
     includeWeeklyPending?: boolean;
+    /**
+     * Week grid: mark once-tasks done only on a completion date, and list them
+     * on that day even when it differs from the scheduled day. Partial workLog
+     * days stay separate via dayWorkSec / workLogOnly.
+     */
+    showCompletionOnFinishDay?: boolean;
   },
 ): Block[] {
   const showUnscheduled = opts?.showUnscheduled ?? false;
   const weekStart = opts?.weekStart;
+  const finishDay = opts?.showCompletionOnFinishDay ?? false;
 
   // Anything with a day: timed ones sort by time, untimed ones come after
   const scheduled: Block[] = tasks
     .filter((t) => isScheduled(t) && occursOn(t, date))
     .map((t, i) => {
       const start = t.startTime ? timeToMin(t.startTime) : 24 * 60 + i;
+      const done = finishDay
+        ? t.completions.includes(date)
+        : t.repeat === "once"
+          ? t.completions.length > 0
+          : t.completions.includes(date);
       return {
         task: t,
         date,
         start,
         end: start + t.duration,
-        // A one-time task counts as done whenever it was finished, even if finished late
-        done: t.repeat === "once" ? t.completions.length > 0 : t.completions.includes(date),
+        done,
         unscheduled: false,
       };
     });
@@ -164,25 +186,46 @@ export function blocksForDate(
         }))
     : [];
 
-  const combined = [...scheduled, ...weekly, ...unscheduled, ...overdue];
+  // Once-tasks finished on a day other than their scheduled day (week grid)
+  const lateCompletions: Block[] = [];
+  if (finishDay) {
+    let i = 0;
+    for (const t of tasks) {
+      if (t.repeat !== "once") continue;
+      if (!t.completions.includes(date)) continue;
+      if (occursOn(t, date)) continue; // already in scheduled
+      lateCompletions.push({
+        task: t,
+        date,
+        start: 27 * 60 + i,
+        end: 27 * 60 + i + t.duration,
+        done: true,
+        unscheduled: false,
+      });
+      i++;
+    }
+  }
+
+  const combined = [...scheduled, ...weekly, ...unscheduled, ...overdue, ...lateCompletions];
 
   // Attach per-day work seconds; add a work-log-only block when this day has effort
   // but the task is not already listed (e.g. worked Sunday on a task dated Monday).
   const seen = new Set(combined.map((b) => b.task.id));
   for (const b of combined) {
-    const sec = b.task.workLog?.[date] ?? 0;
+    const sec = dayWorkSeconds(b.task, date);
     if (sec > 0) b.dayWorkSec = sec;
   }
   let logI = 0;
   for (const t of tasks) {
-    const sec = t.workLog?.[date] ?? 0;
+    const sec = dayWorkSeconds(t, date);
     if (sec <= 0 || seen.has(t.id)) continue;
     combined.push({
       task: t,
       date,
       start: 26 * 60 + logI,
       end: 26 * 60 + logI + t.duration,
-      done: t.repeat === "once" ? t.completions.length > 0 : t.completions.includes(date),
+      // Work-log row is "done" only if this calendar day is a completion date
+      done: t.completions.includes(date),
       dayWorkSec: sec,
       workLogOnly: true,
     });
