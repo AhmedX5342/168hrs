@@ -15,7 +15,15 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
-import { clearAll, exportAll, hydrateStoreCache, importAll } from "@/lib/storage";
+import {
+  clearAll,
+  clearNotes,
+  clearSettings,
+  clearTasks,
+  exportAll,
+  hydrateStoreCache,
+  importAll,
+} from "@/lib/storage";
 import { saveJsonFile } from "@/lib/export-file";
 import { toast } from "@/lib/toast";
 import { useSettings } from "@/features/settings/use-settings";
@@ -303,13 +311,72 @@ export function SettingsPage() {
               if (f) void doImport(f);
             }}
           />
+
+          <div className="mt-4 space-y-1">
+            <p className="text-sm font-medium">Clear selectively</p>
+            <p className="text-xs text-muted-foreground">
+              Remove one kind of data and leave the rest. Export a backup first if you might need
+              it.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            className="justify-start text-destructive hover:text-destructive"
+            onClick={async () => {
+              if (!window.confirm("Clear all tasks? Notes and settings stay.")) return;
+              await clearTasks();
+              await qc.invalidateQueries();
+              toast.success("Tasks cleared");
+              window.setTimeout(() => window.location.reload(), 300);
+            }}
+          >
+            <Trash2 /> Clear tasks only
+          </Button>
+          <Button
+            variant="outline"
+            className="justify-start text-destructive hover:text-destructive"
+            onClick={async () => {
+              if (!window.confirm("Clear all notes and attached images? Tasks and settings stay."))
+                return;
+              await clearNotes();
+              await qc.invalidateQueries();
+              toast.success("Notes cleared");
+              window.setTimeout(() => window.location.reload(), 300);
+            }}
+          >
+            <Trash2 /> Clear notes only
+          </Button>
+          <Button
+            variant="outline"
+            className="justify-start text-destructive hover:text-destructive"
+            onClick={async () => {
+              if (
+                !window.confirm(
+                  "Reset settings (name, life areas, sleep, theme)? Tasks and notes stay.",
+                )
+              )
+                return;
+              await clearSettings();
+              await qc.invalidateQueries();
+              toast.success("Settings reset");
+              window.setTimeout(() => window.location.reload(), 300);
+            }}
+          >
+            <Trash2 /> Clear settings only
+          </Button>
+
           <Button
             variant="destructive"
+            className="mt-2"
             onClick={async () => {
-              if (!window.confirm("Clear all data? This cannot be undone.")) return;
-              void clearAll().then(() => window.location.reload());
+              if (
+                !window.confirm("Clear ALL data (tasks, notes, settings)? This cannot be undone.")
+              )
+                return;
+              await clearAll();
               await qc.invalidateQueries();
               toast.success("All data cleared");
+              window.setTimeout(() => window.location.reload(), 300);
             }}
           >
             <Trash2 /> Clear all data

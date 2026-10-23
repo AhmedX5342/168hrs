@@ -289,3 +289,28 @@ export async function clearAll() {
   clearLegacyLocalStorage();
   clearTheme();
 }
+
+/** Delete all tasks only. Keeps notes, settings, life areas, sleep logs. */
+export async function clearTasks() {
+  await db.tasks.clear();
+}
+
+/** Delete all notes and their image blobs. Keeps tasks and settings. */
+export async function clearNotes() {
+  await db.transaction("rw", db.notes, db.images, async () => {
+    await db.notes.clear();
+    await db.images.clear();
+  });
+}
+
+/**
+ * Reset preferences (name, theme, sleep, life areas, flags) to defaults.
+ * Keeps tasks and notes. Sleep logs are cleared with settings.
+ */
+export async function clearSettings() {
+  await db.transaction("rw", db.kv, async () => {
+    await db.kv.delete("settings");
+    await db.kv.delete("sleepLogs");
+  });
+  clearTheme();
+}
