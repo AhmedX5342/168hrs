@@ -411,7 +411,7 @@ export function WeekView() {
                         b.workLogOnly && "border border-dashed border-primary/30",
                       )}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-start gap-2">
                         <span
                           className={cn(
                             "min-h-4 w-1 shrink-0 self-stretch rounded-full",
@@ -423,29 +423,36 @@ export function WeekView() {
                               : taskAreaColor(settings.lifeAreas, b.task.lifeAreaId),
                           }}
                         />
-                        <span className="min-w-0 flex-1 font-medium [overflow-wrap:anywhere]">
-                          {b.task.title}
-                        </span>
-                        {b.task.startTime && !b.weekly && !b.workLogOnly && (
-                          <span className="shrink-0 tabular-nums text-muted-foreground">
-                            {formatClock(b.task.startTime, settings.clockFormat)}
+                        {/*
+                          Mobile/tablet: title + meta on one row.
+                          lg (7-day grid): stack meta under the title so long names
+                          aren't crushed into a vertical character column.
+                        */}
+                        <div className="flex min-w-0 flex-1 items-center gap-2 lg:flex-col lg:items-stretch lg:gap-0.5">
+                          <span className="min-w-0 flex-1 break-words font-medium [overflow-wrap:break-word] [word-break:normal]">
+                            {b.task.title}
                           </span>
-                        )}
-                        {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
-                        {b.done ? (
-                          <span className="shrink-0 text-muted-foreground">
-                            Done
-                            {daySec > 0 ? ` · ${formatDuration(dayMin)}` : ""}
-                          </span>
-                        ) : daySec > 0 ? (
-                          <span className="shrink-0 font-semibold tabular-nums text-primary">
-                            {dayPct}% · {formatDuration(dayMin)}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {formatDuration(b.task.duration)}
-                          </span>
-                        )}
+                          <div className="flex shrink-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground lg:justify-start">
+                            {b.task.startTime && !b.weekly && !b.workLogOnly && (
+                              <span className="tabular-nums">
+                                {formatClock(b.task.startTime, settings.clockFormat)}
+                              </span>
+                            )}
+                            {b.weekly && <WeeklyBadge short className="px-1.5 text-[10px]" />}
+                            {b.done ? (
+                              <span>
+                                Done
+                                {daySec > 0 ? ` · ${formatDuration(dayMin)}` : ""}
+                              </span>
+                            ) : daySec > 0 ? (
+                              <span className="font-semibold tabular-nums text-primary">
+                                {dayPct}% · {formatDuration(dayMin)}
+                              </span>
+                            ) : (
+                              <span>{formatDuration(b.task.duration)}</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       {daySec > 0 && (
                         <div className="ml-3 h-1 overflow-hidden rounded-full bg-muted">
