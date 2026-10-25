@@ -1,11 +1,11 @@
 # 168hrs
 
 <p align="center">
-  <img src="public/logo.jpeg" alt="168hrs" width="120" />
+<img src="public/logo.jpeg" alt="168hrs" width="120" />
 </p>
 
 <p align="center">
-  <strong>Plan your week around the only budget that matters: 168 hours.</strong>
+<strong>Plan your week around the only budget that matters: 168 hours.</strong>
 </p>
 
 Local-first time & energy planner for people who want to see the whole week clearly — sleep, deep work, life areas, and the spare capacity that’s left.
@@ -30,32 +30,39 @@ Without that view, people overcommit, underestimate recovery, and only notice th
 ## Features
 
 ### Planning
-- **Today view** — day’s blocks, live clock (12/24h), planned vs done
-- **Week view** — full 168h breakdown; navigate past / current / upcoming weeks
-- **Task library** — one-off, recurring, and unscheduled tasks per week
-- **Open-ended tasks** — e.g. “3 workouts this week, any day”
-- **Unexpected tasks** — log things that appear outside the plan (Today & Week)
+- **Today view** — collapsible Incomplete / Unscheduled / Completed; live clock (12/24h); planned vs done (unscheduled counted separately)
+- **Week view** — 7-day grid with area colors, start times, and Done / progress on each card; weekly tasks section
+- **Task library** — one-off, daily, custom weekdays, weekly, and unscheduled tasks per week
+- **Unschedule** — clear a task’s day from the edit form
+- **Unexpected tasks** — log work that appears outside the plan (Today & Week)
 - **Focus levels** — deep / medium / light
-- **Life areas** — tag work and see them as separate segments on the week bar
+- **Life areas** — tag work; separate colored segments on the week bar
+
+### Focus & progress
+- **Focus timer** — fullscreen session, pause/resume, +15 min, keep screen awake, alert when time is up
+- **Per-day work log** — long tasks show % and hours on every day you worked them
+- **Completion day** — finished tasks appear as Done on the day they were completed (week grid)
+- **Carry unfinished** — incomplete work can move into the next week
 
 ### Capacity & sleep
 - **Per-night sleep target** (not a vague weekly lump)
-- **Bedtime / wake schedule** with first-open-of-day wake log
+- **Bedtime / wake schedule** and sleep logs
 - **Wasted sleep** — time above your ideal night (default 8h)
 - **Spare time** — hours left after planned work
 - **Warnings** — low spare (&lt; 3h) and critical overload when work ≥ awake capacity
 
 ### Notes
 - Optional **Notes** module (toggle in Settings)
-- Day-linked notes with optional title & life area
+- Day-linked notes with optional title, life area, and images
 - Pin, edit, delete
 
 ### App polish
 - **Onboarding** for name & first setup
-- **Light / dark** themes
+- **Light / dark** themes (default dark)
 - **First day of week** — any day Sun–Sat
 - **Show unscheduled tasks** on Today (optional)
-- **Import / export / clear** local data
+- **Import / export** full JSON backups (settings, tasks, notes, sleep, images)
+- **Selective clear** — tasks only, notes only, settings only, or everything
 - Works as a **web app**; Android APK via **Capacitor** + GitHub Actions
 
 ---
@@ -65,9 +72,10 @@ Without that view, people overcommit, underestimate recovery, and only notice th
 - React 19 + Vite
 - react-router-dom
 - TanStack Query
+- Dexie (IndexedDB)
 - Tailwind CSS 4
 - shadcn-style UI primitives
-- localStorage (no backend required)
+- Capacitor (Android)
 
 ---
 
@@ -81,27 +89,31 @@ npm run dev
 Open [http://localhost:5173](http://localhost:5173).
 
 ```bash
-npm run build    # production build → dist/
-npm run preview  # preview production build
-npm test         # Vitest
+npm run build # production build → dist/
+npm run preview # preview production build
+npm test # Vitest
 ```
 
 Path alias: `@/*` → `src/*`.
+
+Sample data for screenshots: import `168hrs-sample-data.json` from **Settings → Data**.
 
 ---
 
 ## Routes
 
-| Path | Page |
-|------|------|
-| `/` | Today (`?date=` optional) |
-| `/week` | Week planner |
-| `/tasks` | Current week tasks |
-| `/tasks/weeks` | Weeks list |
-| `/tasks/:weekId` | Tasks for a week |
-| `/notes` | Notes list (if enabled) |
-| `/notes/:noteId` | Note editor |
-| `/settings` | Preferences |
+```
+| Path             | Page                      |
+| ---------------- | ------------------------- |
+| `/`              | Today (`?date=` optional) |
+| `/week`          | Week planner              |
+| `/tasks`         | Current week tasks        |
+| `/tasks/weeks`   | Weeks list                |
+| `/tasks/:weekId` | Tasks for a week          |
+| `/notes`         | Notes list (if enabled)   |
+| `/notes/:noteId` | Note editor               |
+| `/settings`      | Preferences               |
+```
 
 ---
 
@@ -109,15 +121,15 @@ Path alias: `@/*` → `src/*`.
 
 ```
 src/
-├── main.tsx              # BrowserRouter entry
-├── App.tsx               # Routes
-├── components/           # Layout + UI
-├── features/             # Domain (tasks, today, week, notes, settings…)
-├── pages/                # Route screens
+├── main.tsx # BrowserRouter entry
+├── App.tsx # Routes
+├── components/ # Layout + UI
+├── features/ # Domain (tasks, today, week, notes, settings…)
+├── pages/ # Route screens
 ├── hooks/
-└── lib/
+└── lib/ # Dexie storage, dates, timer, …
 public/
-└── logo.jpeg             # App logo / favicon source
+└── logo.jpeg # App logo / favicon source
 ```
 
 ---
@@ -138,7 +150,7 @@ CI: see `.github/workflows/android-build.yml` — builds a debug APK on push and
 
 ## Data
 
-All data stays in the browser (`localStorage`). Export a JSON backup from **Settings → Data** before clearing or switching devices.
+All data stays on-device (**Dexie / IndexedDB**). Legacy localStorage backups still import. Export a JSON backup from **Settings → Data** before clearing or switching devices.
 
 ---
 
